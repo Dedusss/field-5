@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Коллективный организм (ЭКСП. 05) — единственная запись "singleton"
+model Organism {
+  id          String   @id @default("singleton")
+  energy      Int      @default(0)
+  totalGrafts Int      @default(0)
+  totalPulses Int      @default(0)
+  bornAt      DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// История мутаций организма: прививки (graft) и пульсы (pulse)
+model Mutation {
+  id        Int      @id @default(autoincrement())
+  kind      String // 'graft' | 'pulse'
+  angle     Float // угол прививки вокруг ядра (рад)
+  distance  Float // расстояние от ядра (0..1)
+  potency   Float // сила мутации (0..1)
+  visitor   String // метка посетителя, например "гость #a3f2"
+  energy    Int // сколько энергии принесено
+  createdAt DateTime @default(now())
+}
+
+// Телеметрия входов в сцены (хаб и отчёт)
+model Visit {
+  id        Int      @id @default(autoincrement())
+  site      String
+  createdAt DateTime @default(now())
+}
