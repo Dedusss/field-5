@@ -1,0 +1,87 @@
+/**
+ * ЭКСП. 01 «МОНОЛИТ» — локальные keyframes сцены.
+ *
+ * Компоненты (Hud / Overlays / InfoOverlay / FinalOverlay) ссылаются на эти
+ * анимации через Tailwind-произвольные значения [animation:...]. Файл
+ * подключается только вместе со сценой, глобальные стили проекта не трогает.
+ *
+ * Трансформы в keyframes не задают translateX: Tailwind v4 центрует элементы
+ * через нативное свойство `translate`, и оно компонуется с `transform` независимо.
+ */
+
+@keyframes hudIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Подсказка сверху: мягкое появление и медленное растворение. */
+@keyframes hintFade {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Строка «СИГИЛ N/5»: вспышка и уход вверх. */
+@keyframes capLine {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Бегунок бут-экрана: чётверть ширины ходит по треку. */
+@keyframes bootSweep {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(450%);
+  }
+}
+
+/* prefers-reduced-motion: служебные анимации интерфейса схлопываются. */
+@media (prefers-reduced-motion: reduce) {
+  .monolith-root *,
+  .monolith-root *::before,
+  .monolith-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
