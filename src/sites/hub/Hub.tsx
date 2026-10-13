@@ -68,12 +68,16 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
             <span className="font-display text-[11px] font-semibold tracking-[0.22em] text-[#ece7dd]">
               ПОЛЕ ОПЫТОВ
             </span>
-            <span className="font-mono text-[10px] tracking-[0.3em] text-[#8b8175]">FIELD·5</span>
+            <span className="font-mono text-[10px] tracking-[0.3em] text-[#8b8175] hidden sm:inline">
+              FIELD·5
+            </span>
           </button>
           <nav className="flex items-center gap-1 md:gap-2" aria-label="Основная навигация">
+            {/* на узких экранах «Эксперименты» скрыты — список занимает всю страницу ниже,
+                а шапке оставляем короткие пути к отчёту и лаборатории */}
             <button
               onClick={scrollToProjects}
-              className="rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] outline-offset-4 transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]"
+              className="hidden rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] outline-offset-4 transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b] sm:inline-block"
             >
               Эксперименты
             </button>

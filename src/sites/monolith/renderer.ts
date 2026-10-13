@@ -316,7 +316,9 @@ export class MonolithRenderer {
       this.dragX = e.clientX
       this.dragY = e.clientY
       this.lookTX = clamp(this.lookTX + dx * 0.0035, -0.42, 0.42)
-      this.targetZ -= dy * 0.02
+      // свайп вверх = вперёд (dy < 0 → targetZ убывает) — согласовано со
+      // скроллом-колесом и подсказкой «Веди пальцем — идти»
+      this.targetZ += dy * 0.02
       this.applyAim(nx, ny, false)
       return
     }

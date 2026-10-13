@@ -7,6 +7,10 @@
  *   - свечение — заранее растеризованные спрайты (drawImage), режим 'lighter';
  *   - глоу только для глубоких терминалей (level >= 2) и с общим капом;
  *   - фон и виньетка кэшируются в offscreen-канвасах.
+ *
+ * Зрелость: организм взрослеет поколениями, и это видно не только в HUD —
+ * сердце существа (ядро + споры-бусины) с каждым поколением зеленеет:
+ * янтарный свет молодого ядра смешивается с биолюминесценцией колонии.
  */
 
 import type { Mutation } from './api'
@@ -18,6 +22,7 @@ const TAU = Math.PI * 2
 /** цвета уровней: мох → биолюминесцентный зелёный */
 const LEVEL_COLORS = ['#1c5636', '#256b43', '#2f8453', '#3aa465', '#49cf82']
 const GREEN = '#4ef08a'
+/** янтарь интерфейса (крест прививки); сердце организма живёт в this.heart */
 const AMBER = '#e8b34d'
 
 const GLOW_CAP = 240
@@ -106,11 +111,15 @@ export class OrganismRenderer {
 
   private plankton: PlanktonPoint[] = []
 
+  /** текущий цвет сердца (ядро/бусины/эхо) — обновляется в buildHeartSprites */
+  private heart = { r: 232, g: 179, b: 77 }
+
   private bg: HTMLCanvasElement | null = null
   private vig: HTMLCanvasElement | null = null
   private glowSprite: HTMLCanvasElement
-  private coreSprite: HTMLCanvasElement
-  private beadSprite: HTMLCanvasElement
+  /** сердце пересобирается в buildHeartSprites() по поколению */
+  private coreSprite!: HTMLCanvasElement
+  private beadSprite!: HTMLCanvasElement
 
   constructor(canvas: HTMLCanvasElement, cb: RendererCallbacks) {
     this.canvas = canvas
@@ -125,17 +134,7 @@ export class OrganismRenderer {
       [0.55, 'rgba(78,240,138,0.12)'],
       [1, 'rgba(78,240,138,0)'],
     ])
-    this.coreSprite = makeRadialSprite(256, [
-      [0, 'rgba(255,238,196,1)'],
-      [0.16, 'rgba(232,179,77,0.85)'],
-      [0.42, 'rgba(232,179,77,0.26)'],
-      [1, 'rgba(232,179,77,0)'],
-    ])
-    this.beadSprite = makeRadialSprite(48, [
-      [0, 'rgba(255,214,138,0.9)'],
-      [0.3, 'rgba(232,179,77,0.35)'],
-      [1, 'rgba(232,179,77,0)'],
-    ])
+    this.buildHeartSprites()
 
     this.resize()
     if (typeof ResizeObserver !== 'undefined') {
@@ -144,6 +143,35 @@ export class OrganismRenderer {
     }
 
     this.raf = requestAnimationFrame(this.frame)
+  }
+
+  /**
+   * Сердце существа: ядро и споры-бусины. Палитра — интерполяция от янтаря
+   * молодого организма (gen 1, спора) к янтарно-зелёному биолюминесцентному
+   * свету зрелого (gen 5+, лес); белый горячий центр не меняется.
+   * Пересобирается при смене поколения (setStats).
+   */
+  private buildHeartSprites(): void {
+    const t = Math.min(1, Math.max(0, (this.gen - 1) / 4))
+    const mix = (from: number, to: number): number => Math.round(from + (to - from) * 0.62 * t)
+    const r = mix(232, 78)
+    const g = mix(179, 240)
+    const b = mix(77, 138)
+    this.heart = { r, g, b }
+    this.coreSprite = makeRadialSprite(256, [
+      [0, 'rgba(255,238,196,1)'],
+      [0.16, `rgba(${r},${g},${b},0.85)`],
+      [0.42, `rgba(${r},${g},${b},0.26)`],
+      [1, `rgba(${r},${g},${b},0)`],
+    ])
+    const br = mix(255, 190)
+    const bg2 = mix(214, 255)
+    const bb = mix(138, 200)
+    this.beadSprite = makeRadialSprite(48, [
+      [0, `rgba(${br},${bg2},${bb},0.9)`],
+      [0.3, `rgba(${r},${g},${b},0.35)`],
+      [1, `rgba(${r},${g},${b},0)`],
+    ])
   }
 
   /* ------------------------------ публичное API ----------------------------- */
@@ -204,13 +232,14 @@ export class OrganismRenderer {
     this.waves.push({ t0: performance.now(), strength })
   }
 
-  /** // maturity — зрелость организма от поколения (виньетка, планктон) */
+  /** // maturity — зрелость организма от поколения: виньетка, планктон, сердце */
   setStats(gen: number): void {
     const g = Math.max(1, gen | 0)
     if (g === this.gen) return
     this.gen = g
     this.syncPlankton()
     this.buildVignette()
+    this.buildHeartSprites()
   }
 
   setReducedMotion(v: boolean): void {
@@ -447,6 +476,11 @@ export class OrganismRenderer {
     ctx.globalCompositeOperation = 'source-over'
   }
 
+  /** rgba-строка цвета сердца с альфой. */
+  private heartCss(a: number): string {
+    return `rgba(${this.heart.r},${this.heart.g},${this.heart.b},${a.toFixed(3)})`
+  }
+
   private drawCore(ctx: CanvasRenderingContext2D, t: number): void {
     const beat = this.reduced ? 0.45 : 1
     const s1 = this.R * (0.46 + 0.035 * Math.sin(t * 1.35) * beat)
@@ -454,8 +488,8 @@ export class OrganismRenderer {
     ctx.globalCompositeOperation = 'lighter'
     ctx.drawImage(this.coreSprite, this.cx - s1, this.cy - s1, s1 * 2, s1 * 2)
     ctx.drawImage(this.coreSprite, this.cx - s2, this.cy - s2, s2 * 2, s2 * 2)
-    // мембрана ядра
-    ctx.strokeStyle = 'rgba(232,179,77,0.16)'
+    // мембрана ядра — цветом сердца
+    ctx.strokeStyle = this.heartCss(0.16)
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.arc(this.cx, this.cy, this.R * 0.125, 0, TAU)
@@ -613,7 +647,7 @@ export class OrganismRenderer {
       ctx.globalAlpha = 0.16 + 0.2 * flick
       ctx.drawImage(this.beadSprite, x - s, y - s, s * 2, s * 2)
       ctx.globalAlpha = 1
-      ctx.fillStyle = AMBER
+      ctx.fillStyle = this.heartCss(1)
       ctx.beginPath()
       ctx.arc(x, y, 1.9, 0, TAU)
       ctx.fill()
@@ -637,8 +671,8 @@ export class OrganismRenderer {
       ctx.beginPath()
       ctx.arc(this.cx, this.cy, r * this.R, 0, TAU)
       ctx.stroke()
-      // эхо-кольцо
-      ctx.strokeStyle = `rgba(232,179,77,${(alpha * 0.35).toFixed(3)})`
+      // эхо-кольцо — цветом сердца
+      ctx.strokeStyle = this.heartCss(alpha * 0.35)
       ctx.lineWidth = 1
       ctx.beginPath()
       ctx.arc(this.cx, this.cy, r * this.R * 0.86, 0, TAU)

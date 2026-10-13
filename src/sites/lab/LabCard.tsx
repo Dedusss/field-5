@@ -156,7 +156,7 @@ export default function LabCard({ demo, index, reduced }: LabCardProps) {
   const idx = `L·${String(index + 1).padStart(2, '0')}`
 
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-lg border border-white/[0.08] bg-[#14120f]/90 shadow-[0_10px_40px_rgba(0,0,0,0.35)]">
+    <article className="group relative flex flex-col overflow-hidden rounded-lg border border-white/[0.08] bg-[#14120f]/90 shadow-[0_10px_40px_rgba(0,0,0,0.35)] transition-colors duration-300 hover:border-white/[0.16]">
       {/* Шапка прибора */}
       <header className="flex items-center gap-3 border-b border-white/[0.08] px-4 py-3">
         <span className="font-mono text-[10px] tracking-[0.18em] text-[#e8b34d]">{idx}</span>
@@ -219,7 +219,7 @@ export default function LabCard({ demo, index, reduced }: LabCardProps) {
                 value={params[p.key] as number}
                 onChange={(e) => setParamValue(p.key, parseFloat(e.target.value))}
                 aria-label={p.label}
-                className="h-1 w-full cursor-pointer appearance-none rounded-full outline-none [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-[#e8b34d] [&::-moz-range-thumb]:bg-[#161411] [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[#e8b34d] [&::-webkit-slider-thumb]:bg-[#161411] [&::-webkit-slider-thumb]:shadow-[0_0_0_3px_rgba(232,179,77,0.14)]"
+                className="h-1 w-full cursor-pointer appearance-none rounded-full outline-offset-4 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#e8b34d]/70 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-[#e8b34d] [&::-moz-range-thumb]:bg-[#161411] [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[#e8b34d] [&::-webkit-slider-thumb]:bg-[#161411] [&::-webkit-slider-thumb]:shadow-[0_0_0_3px_rgba(232,179,77,0.14)]"
                 style={{
                   background: `linear-gradient(90deg, rgba(232,179,77,0.85) ${rangePct(p, params[p.key] as number)}%, rgba(255,255,255,0.12) ${rangePct(p, params[p.key] as number)}%)`,
                 }}
@@ -232,7 +232,7 @@ export default function LabCard({ demo, index, reduced }: LabCardProps) {
                 aria-checked={params[p.key] as boolean}
                 aria-label={p.label}
                 onClick={() => setParamValue(p.key, !(params[p.key] as boolean))}
-                className={`flex h-5 w-9 items-center rounded-full border px-0.5 transition-colors ${
+                className={`flex h-5 w-9 items-center rounded-full border px-0.5 outline-offset-4 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#e8b34d] ${
                   params[p.key]
                     ? 'border-[#e8b34d]/60 bg-[#e8b34d]/15'
                     : 'border-white/15 bg-white/[0.04]'
@@ -255,7 +255,7 @@ export default function LabCard({ demo, index, reduced }: LabCardProps) {
                       type="button"
                       onClick={() => setParamValue(p.key, o.value)}
                       aria-pressed={active}
-                      className={`rounded-sm border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] transition-colors ${
+                      className={`rounded-sm border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.08em] outline-offset-2 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#e8b34d] ${
                         active
                           ? 'border-[#e8b34d]/55 bg-[#e8b34d]/10 text-[#e8b34d]'
                           : 'border-white/10 text-[#8b8175] hover:border-white/25 hover:text-[#b5ac9e]'
