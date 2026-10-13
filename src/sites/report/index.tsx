@@ -257,6 +257,19 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
           </div>
         </header>
 
+        {/* Корешок-колонтитул: вертикальная надпись текущего раздела на левом
+            поле листа — как на корешке печатного издания; на широких экранах */}
+        <div
+          aria-hidden
+          className="pointer-events-none fixed left-2.5 top-1/2 z-20 hidden -translate-y-1/2 flex-col items-center gap-3 lg:flex"
+        >
+          <span className="h-9 w-px bg-gradient-to-b from-transparent to-[#d9a05b]/70" />
+          <span className="font-mono text-[9px] uppercase tracking-[0.34em] text-[#6f675a] [writing-mode:vertical-rl]">
+            {NAV.find((n) => n.id === activeId)?.label ?? 'ПОЛЕ ОПЫТОВ'}
+          </span>
+          <span className="h-9 w-px bg-gradient-to-t from-transparent to-[#d9a05b]/70" />
+        </div>
+
         <main className="relative z-10 flex-1">
           {/* ГЕРОЙ */}
           <section className="mx-auto max-w-[1440px] px-5 pb-14 pt-14 md:px-10 md:pb-20 md:pt-20">

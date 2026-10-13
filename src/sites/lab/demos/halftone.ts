@@ -17,8 +17,14 @@
  * и +60°: при базовом 45° получается классическая тройка 15/45/75°
  * трёхцветной печати.
  *
- * Курсор работает лупой: приближает изображение, не ломая решётку;
- * зажатая кнопка усиливает увеличение.
+ * Курсор работает лупой — двумя способами. «Варп»: приближает поле,
+ * не ломая решётку; зажатая кнопка усиливает увеличение. «Осмотр» —
+ * лупа печатника: круглое стекло в тёмной оправе показывает уже
+ * напечатанный растр под настоящим увеличением — точки растут, как под
+ * стеклом; перекрестие и бейдж кратности нарисованы на стекле.
+ *
+ * В многоцветных прогонах на серединах боковых краёв печатаются приводные
+ * мишени (круг с перекрестием) — печатник сверяет по ним совмещение красок.
  */
 
 import { clamp, TAU } from '@/lib/lab/math'
@@ -89,8 +95,8 @@ export const halftoneDemo: DemoModule = {
   latin: 'HALFTONE',
   category: 'shaders',
   description:
-    'Полутоновой растр, как в газетной печати: непрерывное поле яркости переводится в сетку чернильных точек — площадь точки кодирует тон, решётка повёрнута на классический печатный угол. В режиме дуотона второй прогон краски печатает инверсию поля со сдвигом решётки на +30°: где первой краски мало, второй много — сумма чернил постоянна, как у настоящего дуплекса. Трихромия раскладывает тон на три пластины — тени, средние тона, света — тремя красками под углами +30° и +60°: при базовом угле 45° получается классическая тройка 15/45/75° трёхцветной печати. Курсор работает лупой: приближает изображение, не ломая решётку; зажатая кнопка усиливает увеличение. Источник «клин» — контрольная шкала печатника: девять полей заданного тона, на каждом видно, как растр кодирует тон площадью точки.',
-  tech: 'canvas 2d · повёрнутые решётки растра · радиус ~ sqrt(тон) · до трёх прогонов краски (дуотон +30°, трихромия +60°) · варп поля лупой · бумага с зерном и метками реза · клин — контрольная шкала тона',
+    'Полутоновой растр, как в газетной печати: непрерывное поле яркости переводится в сетку чернильных точек — площадь точки кодирует тон, решётка повёрнута на классический печатный угол. В режиме дуотона второй прогон краски печатает инверсию поля со сдвигом решётки на +30°: где первой краски мало, второй много — сумма чернил постоянна, как у настоящего дуплекса. Трихромия раскладывает тон на три пластины — тени, средние тона, света — тремя красками под углами +30° и +60°: при базовом угле 45° получается классическая тройка 15/45/75° трёхцветной печати. Курсор работает лупой двумя способами: «варп поля» приближает поле, не ломая решётку, а «осмотр растра» — лупа печатника: круглое стекло в тёмной оправе показывает уже напечатанный лист под настоящим увеличением, с перекрестием и бейджем кратности на стекле; зажатая кнопка усиливает увеличение. Источник «клин» — контрольная шкала печатника: девять полей заданного тона, на каждом видно, как растр кодирует тон площадью точки; в многоцветных прогонах по краям листа печатаются приводные мишени — по ним сверяют совмещение красок.',
+  tech: 'canvas 2d · повёрнутые решётки растра · радиус ~ sqrt(тон) · до трёх прогонов краски (дуотон +30°, трихромия +60°) · варп поля лупой · осмотр растра — само-отражение кадра с масштабом · бумага с зерном и метками реза · приводные мишени · клин — контрольная шкала тона',
   params: [
     {
       key: 'source',
@@ -115,6 +121,16 @@ export const halftoneDemo: DemoModule = {
         { value: 'single', label: 'одна краска' },
         { value: 'duotone', label: 'дуотон' },
         { value: 'trichrome', label: 'трихромия' },
+      ],
+    },
+    {
+      key: 'loupe',
+      label: 'Лупа',
+      kind: 'select',
+      value: 'warp',
+      options: [
+        { value: 'warp', label: 'варп поля' },
+        { value: 'inspect', label: 'осмотр растра' },
       ],
     },
     {
@@ -165,6 +181,7 @@ export const halftoneDemo: DemoModule = {
     let cell = numParam(params, 'cell', 12)
     let angleDeg = numParam(params, 'angle', 45)
     let passKey = strParam(params, 'pass', 'single')
+    let loupeKey = strParam(params, 'loupe', 'warp')
     let inkKey = strParam(params, 'ink', 'ink')
     let ink2Key = strParam(params, 'ink2', 'vermilion')
     let ink3Key = strParam(params, 'ink3', 'ochre')
@@ -224,9 +241,10 @@ export const halftoneDemo: DemoModule = {
       if (opts.reduced) render(2.7)
     }
 
-    /** Поле с учётом лупы: позиция (x, y) смотрит в «увеличенную» точку поля. */
+    /** Поле с учётом лупы: позиция (x, y) смотрит в «увеличенную» точку поля.
+     * В режиме осмотра поле не искажается — увеличено будет само стекло. */
     const sample = (x: number, y: number, t: number): number => {
-      const active = pointer.x > -1000 && pointer.y > -1000
+      const active = pointer.x > -1000 && pointer.y > -1000 && loupeKey !== 'inspect'
       let sx = x
       let sy = y
       if (active) {
@@ -294,6 +312,79 @@ export const halftoneDemo: DemoModule = {
       ctx.fill()
     }
 
+    /**
+     * Лупа печатника (осмотр): круглое окно показывает уже напечатанный
+     * растр под настоящим увеличением — точки растут, как под стеклом.
+     * Окно вырезается из только что нарисованного кадра: лист отражается
+     * в самого себя с масштабом вокруг курсора. Приборные детали: тёмная
+     * оправа, бумажная рисочка по краю стекла, перекрестие с зазором
+     * и бейдж кратности — как гравировка на оправе.
+     */
+    function drawInspectLoupe(): void {
+      const px = pointer.x
+      const py = pointer.y
+      const mag = pointer.down ? MAG_DOWN : MAG_HOVER
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(px, py, LOUPE_R, 0, TAU)
+      ctx.clip()
+      // увеличенная копия только что напечатанного листа — вокруг курсора
+      ctx.save()
+      ctx.translate(px, py)
+      ctx.scale(mag, mag)
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, -px, -py, w, h)
+      ctx.restore()
+      // бумажная рисочка по краю стекла — отделяет картинку от оправы
+      ctx.strokeStyle = 'rgba(239,229,207,0.85)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(px, py, LOUPE_R - 1, 0, TAU)
+      ctx.stroke()
+      // перекрестие: четыре штриха с зазором в центре
+      ctx.strokeStyle = 'rgba(38,32,26,0.6)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      const ticks: readonly (readonly [number, number])[] = [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]
+      for (const [dx, dy] of ticks) {
+        ctx.moveTo(px + dx * 3, py + dy * 3)
+        ctx.lineTo(px + dx * 11, py + dy * 11)
+      }
+      ctx.stroke()
+      // бейдж кратности
+      const label = `×${mag.toFixed(1)}`
+      ctx.font = '600 10px ui-monospace, Menlo, Consolas, monospace'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const bw = ctx.measureText(label).width + 12
+      const bx = px - bw / 2
+      const by = py + LOUPE_R - 22
+      ctx.fillStyle = '#efe5cf'
+      ctx.fillRect(bx, by, bw, 16)
+      ctx.strokeStyle = 'rgba(38,32,26,0.55)'
+      ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 15)
+      ctx.fillStyle = '#26201a'
+      ctx.fillText(label, px, by + 8.5)
+      ctx.restore()
+      // тёмная оправа вокруг стекла + тонкая внешняя риска
+      ctx.strokeStyle = 'rgba(38,32,26,0.92)'
+      ctx.lineWidth = 5
+      ctx.beginPath()
+      ctx.arc(px, py, LOUPE_R + 2.5, 0, TAU)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(38,32,26,0.35)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.arc(px, py, LOUPE_R + 5.5, 0, TAU)
+      ctx.stroke()
+    }
+
     function render(t: number): void {
       if (w < 2 || h < 2) return
       // лист
@@ -344,26 +435,53 @@ export const halftoneDemo: DemoModule = {
       ctx.stroke()
       ctx.globalAlpha = 1
 
-      // кольцо лупы: тонкая окружность вокруг курсора; в дуотоне — цветом
-      // второй краски, в трихромии — третьей, чтобы под курсором читались
-      // обе дополнительные пластины
-      if (pointer.x > -1000 && pointer.y > -1000) {
-        ctx.strokeStyle =
-          passKey === 'trichrome'
-            ? (INKS[ink3Key] ?? INKS.ochre)
-            : passKey === 'duotone'
-              ? (INKS[ink2Key] ?? INKS.vermilion)
-              : (INKS[inkKey] ?? INKS.ink)
-        ctx.globalAlpha = 0.38
+      // приводные мишени: круг с перекрестием на серединах боковых краёв —
+      // печатник сверяет по ним совмещение прогонов краски; появляются
+      // только в многоцветной печати, где приводка имеет смысл
+      if (passKey !== 'single') {
+        ctx.strokeStyle = INKS[inkKey] ?? INKS.ink
+        ctx.globalAlpha = 0.55
         ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.arc(pointer.x, pointer.y, LOUPE_R, 0, TAU)
-        ctx.stroke()
+        const my = h / 2
+        const mArm = 9
+        for (const mx of [inset + 1, w - inset - 1]) {
+          ctx.beginPath()
+          ctx.arc(mx, my, 4.5, 0, TAU)
+          ctx.moveTo(mx - mArm, my)
+          ctx.lineTo(mx + mArm, my)
+          ctx.moveTo(mx, my - mArm)
+          ctx.lineTo(mx, my + mArm)
+          ctx.stroke()
+        }
         ctx.globalAlpha = 1
+      }
+
+      // курсор: варп-лупа обводит кольцо в цвете последней пластины, чтобы
+      // под курсором читались дополнительные краски; осмотр — целое стекло
+      // в оправе (перекрестие, бейдж кратности)
+      if (pointer.x > -1000 && pointer.y > -1000) {
+        if (loupeKey === 'inspect') {
+          drawInspectLoupe()
+        } else {
+          ctx.strokeStyle =
+            passKey === 'trichrome'
+              ? (INKS[ink3Key] ?? INKS.ochre)
+              : passKey === 'duotone'
+                ? (INKS[ink2Key] ?? INKS.vermilion)
+                : (INKS[inkKey] ?? INKS.ink)
+          ctx.globalAlpha = 0.38
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.arc(pointer.x, pointer.y, LOUPE_R, 0, TAU)
+          ctx.stroke()
+          ctx.globalAlpha = 1
+        }
       }
     }
 
     resize()
+    // в режиме осмотра курсор заменяет стекло лупы
+    if (loupeKey === 'inspect') canvas.style.cursor = 'none'
 
     return {
       pointer,
@@ -384,6 +502,10 @@ export const halftoneDemo: DemoModule = {
           angleDeg = value
         } else if (key === 'pass' && typeof value === 'string') {
           passKey = value
+        } else if (key === 'loupe' && typeof value === 'string') {
+          loupeKey = value
+          // осмотр прячет курсор — стекло занимает его место; варп возвращает
+          canvas.style.cursor = value === 'inspect' ? 'none' : ''
         } else if (key === 'ink' && typeof value === 'string') {
           inkKey = value
         } else if (key === 'ink2' && typeof value === 'string') {
@@ -394,6 +516,8 @@ export const halftoneDemo: DemoModule = {
       },
       resize,
       destroy() {
+        // вернуть курсор, если осмотр его спрятал
+        canvas.style.cursor = ''
         /* кэш бумаги подберёт сборщик мусора */
       },
     }

@@ -98,16 +98,27 @@ export default function LabCard({ demo, index, reduced }: LabCardProps) {
     return () => ro.disconnect()
   }, [])
 
-  // Курсор: пишем позицию и состояние кнопки в слот демо.
+  // Курсор: пишем позицию и состояние кнопки в слот демо. В reduced-motion
+  // цикл демо стоит, но курсор тоже живой: после движения — один статичный
+  // кадр, сгруппированный в rAF (рисуем не чаще кадра).
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    let poke = 0
+    const redraw = (): void => {
+      if (poke) return
+      poke = requestAnimationFrame(() => {
+        poke = 0
+        loop.once()
+      })
+    }
     const apply = (e: PointerEvent): void => {
       const inst = instRef.current
       if (!inst?.pointer) return
       const r = canvas.getBoundingClientRect()
       inst.pointer.x = e.clientX - r.left
       inst.pointer.y = e.clientY - r.top
+      if (reduced) redraw()
     }
     const onMove = (e: PointerEvent): void => apply(e)
     const onDown = (e: PointerEvent): void => {
@@ -128,6 +139,7 @@ export default function LabCard({ demo, index, reduced }: LabCardProps) {
       inst.pointer.x = -9999
       inst.pointer.y = -9999
       inst.pointer.down = false
+      if (reduced) redraw() // лупа должна уйти вместе с курсором
     }
     canvas.addEventListener('pointermove', onMove)
     canvas.addEventListener('pointerdown', onDown)
@@ -135,13 +147,14 @@ export default function LabCard({ demo, index, reduced }: LabCardProps) {
     canvas.addEventListener('pointercancel', onUp)
     canvas.addEventListener('pointerleave', onLeave)
     return () => {
+      if (poke) cancelAnimationFrame(poke)
       canvas.removeEventListener('pointermove', onMove)
       canvas.removeEventListener('pointerdown', onDown)
       canvas.removeEventListener('pointerup', onUp)
       canvas.removeEventListener('pointercancel', onUp)
       canvas.removeEventListener('pointerleave', onLeave)
     }
-  }, [])
+  }, [reduced, loop])
 
   const setParamValue = useCallback(
     (key: string, value: ParamValue) => {
