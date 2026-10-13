@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { animate, motion, useReducedMotion } from 'framer-motion'
 import { ArrowUpRight, FlaskConical, FileSearch, Activity } from 'lucide-react'
 import { SITES, LAB_META, REPORT_META, type SiteMeta } from '@/sites/manifest'
 import { SitePreviewCanvas, type PreviewKind } from '@/sites/hub/previews'
@@ -24,6 +24,12 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
   const [organism, setOrganism] = useState<OrganismStats | null>(null)
   const [hovered, setHovered] = useState<PreviewKind | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  /* позиция плавающей превью-панели: мышь или клавиатурный якорь;
+     ref, а не state — позиция применяется мутацией transform без ре-рендеров */
+  const posRef = useRef<{ x: number; y: number } | null>(null)
+  /* счётчик для count-up телеметрии (null = без анимации) */
+  const [shownTotal, setShownTotal] = useState<number | null>(null)
 
   useEffect(() => {
     fetch('/api/telemetry')
@@ -36,17 +42,81 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
       .catch(() => {})
   }, [])
 
+  /* Клавиатурные короткие пути: 1–5 — эксперименты, R — отчёт, L — лаборатория.
+     Модификаторы не перехватываем (Ctrl+R и пр. остаются браузеру),
+     поля ввода не трогаем. Слушатель живёт, пока смонтирован хаб. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      const n = Number.parseInt(e.key, 10)
+      if (Number.isInteger(n) && n >= 1 && n <= SITES.length) {
+        navigate(SITES[n - 1].slug as RouteSlug)
+        return
+      }
+      const k = e.key.toLowerCase()
+      if (k === 'r') navigate('report')
+      else if (k === 'l') navigate('lab')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [navigate])
+
+  /* Count-up «сцен открыто»: цифра вырастает из нуля (в reduced-motion — сразу) */
+  useEffect(() => {
+    if (!telemetry || reducedMotion) return
+    const controls = animate(0, telemetry.total, {
+      duration: 0.9,
+      ease: 'easeOut',
+      onUpdate: (v) => setShownTotal(Math.round(v)),
+    })
+    return () => controls.stop()
+  }, [telemetry, reducedMotion])
+
   const onListMouseMove = useCallback((e: React.MouseEvent) => {
-    const panel = panelRef.current
-    if (!panel) return
     const x = Math.min(e.clientX + 28, window.innerWidth - 360)
     const y = Math.min(Math.max(e.clientY - 130, 16), window.innerHeight - 250)
-    panel.style.transform = `translate3d(${x}px, ${y}px, 0)`
+    posRef.current = { x, y }
+    const panel = panelRef.current
+    if (panel) panel.style.transform = `translate3d(${x}px, ${y}px, 0)`
+  }, [])
+
+  /* Клавиатурный якорь: панель превью встаёт справа от сфокусированной строки,
+     по центру её высоты (мышь при первом же движении перехватывает позицию) */
+  const onAnchorRow = useCallback((rect: DOMRect) => {
+    const x = Math.min(Math.max(28, rect.right - 358), window.innerWidth - 360)
+    const y = Math.min(Math.max(rect.top + rect.height / 2 - 125, 16), window.innerHeight - 266)
+    posRef.current = { x, y }
+    const panel = panelRef.current
+    if (panel) panel.style.transform = `translate3d(${x}px, ${y}px, 0)`
   }, [])
 
   const scrollToProjects = () => {
     document.getElementById('projects')?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' })
   }
+
+  /* Стрелки — бродящий фокус по списку экспериментов (Enter уже работает:
+     строки — настоящие кнопки). Home/End — в начало/конец. */
+  const onListKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    const list = listRef.current
+    if (!list) return
+    const rows = list.querySelectorAll<HTMLButtonElement>('button')
+    if (rows.length === 0) return
+    const idx = Array.prototype.indexOf.call(rows, document.activeElement)
+    let target: number | null = null
+    if (e.key === 'ArrowDown') target = Math.min(idx + 1, rows.length - 1)
+    else if (e.key === 'ArrowUp') target = Math.max(idx - 1, 0)
+    else if (e.key === 'Home') target = 0
+    else if (e.key === 'End') target = rows.length - 1
+    if (target === null) return
+    e.preventDefault()
+    const row = rows[target as number]
+    row.focus()
+    /* подводим строку в поле зрения, если фокус ушёл за складку */
+    row.scrollIntoView({ block: 'nearest' })
+  }, [])
 
   const maxVisits = telemetry
     ? Math.max(1, ...Object.values(telemetry.sites ?? {}))
@@ -147,7 +217,7 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
           <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-white/[0.07] pt-5 font-mono text-[11px] tracking-[0.12em] text-[#8b8175]">
             <span className="flex items-center gap-2">
               <Activity className="h-3.5 w-3.5 text-[#d9a05b]" />
-              СЦЕН ОТКРЫТО: {telemetry ? telemetry.total : '—'}
+              СЦЕН ОТКРЫТО: {telemetry ? (shownTotal ?? telemetry.total) : '—'}
             </span>
             <span>
               ОРГАНИЗМ: ПОКОЛЕНИЕ {organism ? organism.generation : '—'} · ВЕТВЕЙ{' '}
@@ -166,7 +236,17 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
             <span className="font-mono text-[10px] tracking-[0.2em] text-[#5e574c]">01 — 05</span>
           </div>
 
-          <div onMouseMove={onListMouseMove} onMouseLeave={() => setHovered(null)}>
+          {/* Подсказка клавиатурного входа (только десктоп) */}
+          <p className="mb-6 hidden font-mono text-[10px] uppercase tracking-[0.18em] text-[#5e574c] sm:block">
+            Клавиатура: 1–5 — открыть эксперимент · R — отчёт · L — лаборатория · ↑↓ — по списку
+          </p>
+
+          <div
+            ref={listRef}
+            onKeyDown={onListKeyDown}
+            onMouseMove={onListMouseMove}
+            onMouseLeave={() => setHovered(null)}
+          >
             {SITES.map((site, i) => (
               <ProjectRow
                 key={site.slug}
@@ -175,6 +255,7 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
                 visits={telemetry?.sites?.[site.slug] ?? 0}
                 onEnter={() => navigate(site.slug)}
                 onHover={setHovered}
+                onAnchorRow={onAnchorRow}
               />
             ))}
           </div>
@@ -182,10 +263,22 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
           {/* Плавающая превью-панель (только десктоп) */}
           {hovered && (
             <div
-              ref={panelRef}
+              ref={(el) => {
+                panelRef.current = el
+                /* при (пере)монтировании панели применяем последнюю позицию,
+                   чтобы клавиатурный фокус не оставлял её в углу (0,0) */
+                if (el && posRef.current) {
+                  el.style.transform = `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0)`
+                }
+              }}
               className="pointer-events-none fixed left-0 top-0 z-40 hidden w-[330px] lg:block"
             >
-              <div className="overflow-hidden rounded-md border border-white/[0.12] bg-[#0b0a09]/95 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur">
+              <motion.div
+                initial={reducedMotion ? false : { opacity: 0, scale: 0.96, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+                className="overflow-hidden rounded-md border border-white/[0.12] bg-[#0b0a09]/95 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur"
+              >
                 <SitePreviewCanvas kind={hovered} className="block aspect-[16/10] w-full" />
                 <div className="flex items-center justify-between border-t border-white/[0.08] px-3.5 py-2.5">
                   <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#8b8175]">
@@ -195,7 +288,7 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
                     {SITES.find((s) => s.slug === hovered)?.index}
                   </span>
                 </div>
-              </div>
+              </motion.div>
             </div>
           )}
         </section>
@@ -245,7 +338,7 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
               Живая телеметрия посещений
             </h2>
             <div className="space-y-3">
-              {SITES.map((s) => {
+              {SITES.map((s, i) => {
                 const v = telemetry.sites?.[s.slug] ?? 0
                 return (
                   <div key={s.slug} className="flex items-center gap-4">
@@ -253,12 +346,12 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
                       {s.index} {s.title}
                     </span>
                     <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{
-                          width: `${Math.max(2, (v / maxVisits) * 100)}%`,
-                          backgroundColor: s.accent,
-                        }}
+                      <motion.div
+                        initial={reducedMotion ? false : { width: 0 }}
+                        animate={{ width: `${Math.max(2, (v / maxVisits) * 100)}%` }}
+                        transition={{ duration: 0.8, delay: 0.06 * i, ease: 'easeOut' }}
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: s.accent }}
                       />
                     </div>
                     <span className="w-8 shrink-0 text-right font-mono text-[11px] text-[#b5ac9e]">
@@ -290,20 +383,31 @@ function ProjectRow({
   visits,
   onEnter,
   onHover,
+  onAnchorRow,
 }: {
   site: SiteMeta
   index: number
   visits: number
   onEnter: () => void
   onHover: (kind: PreviewKind | null) => void
+  onAnchorRow: (rect: DOMRect) => void
 }) {
+  const reducedMotion = useReducedMotion()
   return (
-    <button
+    <motion.button
       onClick={onEnter}
       onMouseEnter={() => onHover(site.slug)}
-      onFocus={() => onHover(site.slug)}
+      onFocus={(e) => {
+        /* клавиатурный фокус: якорим превью-панель к строке */
+        if (e.currentTarget.matches(':focus-visible')) onAnchorRow(e.currentTarget.getBoundingClientRect())
+        onHover(site.slug)
+      }}
       onBlur={() => onHover(null)}
-      className="group block w-full border-t border-white/[0.08] py-7 text-left outline-offset-[-3px] transition-colors duration-300 last:border-b hover:bg-white/[0.025] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]/60 md:py-8"
+      initial={reducedMotion ? false : { opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ duration: 0.55, delay: (index % 2) * 0.06, ease: 'easeOut' }}
+      className="group relative block w-full border-t border-white/[0.08] py-7 text-left outline-offset-[-3px] transition-colors duration-300 last:border-b hover:bg-white/[0.025] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]/60 md:py-8 before:content-[''] before:absolute before:left-0 before:top-1/2 before:block before:h-0 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-[var(--site-accent)] before:transition-[height] before:duration-300 hover:before:h-14 focus-visible:before:h-14"
       style={{ '--site-accent': site.accent } as React.CSSProperties}
       aria-label={`Открыть эксперимент ${site.index} «${site.title}»`}
     >
@@ -360,6 +464,6 @@ function ProjectRow({
         <SitePreviewCanvas kind={site.slug} className="block aspect-[16/8] w-full" />
       </div>
       <span className="sr-only">Эксперимент {index + 1} из 5</span>
-    </button>
+    </motion.button>
   )
 }
