@@ -423,12 +423,12 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
             <SectionHead
               index="05"
               title="Лаборатория: приборы, из которых всё выросло"
-              note="этап V · 8 демо · src/lib/lab"
+              note="этап V · 9 демо · src/lib/lab"
             />
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div>
                 <p className="max-w-2xl text-[15px] leading-relaxed text-[#b5ac9e]">
-                  Восемь приборных панелей с живыми параметрами — прототипы, на которых
+                  Девять приборных панелей с живыми параметрами — прототипы, на которых
                   приёмы отрабатывались до попадания в эксперименты. Каждое демо —
                   автономный прибор: экран реагирует на курсор, панель параметров честно
                   пересчитывает кадр.

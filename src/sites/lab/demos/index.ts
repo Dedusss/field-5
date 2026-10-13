@@ -13,6 +13,7 @@ import { feedbackDemo } from './feedback'
 import { textParticlesDemo } from './textParticles'
 import { lgardenDemo } from './lgarden'
 import { verletRopeDemo } from './verletRope'
+import { oscilloscopeDemo } from './oscilloscope'
 
 export const DEMOS: DemoModule[] = [
   flowFieldDemo,
@@ -23,6 +24,7 @@ export const DEMOS: DemoModule[] = [
   textParticlesDemo,
   lgardenDemo,
   verletRopeDemo,
+  oscilloscopeDemo,
 ]
 
 /** Метаданные категорий для фильтров и чипов карточек. */

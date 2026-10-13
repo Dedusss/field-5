@@ -3,7 +3,7 @@
 /**
  * ЛАБОРАТОРИЯ · FIELD·5 (Этап V) — галерея живых микро-демо.
  *
- * Восемь приборных панелей, из которых выросли пять экспериментов проекта.
+ * Девять приборных панелей, из которых выросли пять экспериментов проекта.
  * Страница скроллится: липкая шапка с фильтрами категорий, сетка карточек,
  * прижатый футер. Каждая карточка — автономное демо с параметрами.
  */
@@ -85,11 +85,11 @@ export default function LabSite({ onExit }: { onExit: () => void }) {
               ЛАБОРАТОРИЯ
             </h1>
             <p className="mt-5 max-w-2xl font-serif text-[clamp(1.25rem,2.6vw,1.7rem)] italic leading-snug text-[#c9bfa9]">
-              Восемь приборных панелей, из которых выросли{' '}
+              Девять приборных панелей, из которых выросли{' '}
               <span className="text-[#e8b34d]">пять экспериментов</span>
             </p>
             <div className="mt-7 flex flex-wrap gap-x-7 gap-y-2 border-t border-white/[0.07] pt-5 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8b8175]">
-              <span>8 демо · 4 категории</span>
+              <span>9 демо · 4 категории</span>
               <span>canvas 2d · webgl2</span>
               <span>модули: math / glkit / useDemoLoop</span>
               <span>курсор — часть прибора</span>
