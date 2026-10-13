@@ -1,0 +1,70 @@
+# Лаборатория и переиспользуемая библиотека
+
+`#/lab` — восемь «приборных панелей» с живыми параметрами. Каждая — автономный модуль,
+зарегистрированный в `src/sites/lab/demos/index.ts`; карточка (`LabCard.tsx`) запускает рендер
+по IntersectionObserver (пауза вне вьюпорта) и полностью убивает его при unmount.
+
+## Демо
+
+| Индекс | Название | Категория | Что показывает |
+|---|---|---|---|
+| L·01 | Поле потока | Поля | Частицы по полю углов из value noise; курсор — локальное завихрение |
+| L·02 | Curl-шум | Поля | Бездивергентное поле: скорость = ротор функции тока (центральные разности); линии тока |
+| L·03 | SDF-площадка | Шейдеры | Raymarch: сфера+бокс+тор через smin, мягкая тень, туман; тумблер числа шагов (48/64/96) |
+| L·04 | Дизеринг и палитры | Шейдеры | fbm-градиент → квантование + ordered dithering Bayer 4×4, три палитры-рампа |
+| L·05 | Обратная связь | Шейдеры | Трейлы: кадр рисуется поверх себя с затуханием; курсор-кисть |
+| L·06 | Текст → частицы | Генерация | Альфа-сэмпл текста → частицы с пружинами к домам; курсор расталкивает |
+| L·07 | L-сад | Генерация | Детерминированные L-системы с анимацией прорастания и ветром |
+| L·08 | Верлет-канат | Физика | Цепочка с дистанционными связями; слайдер итераций показывает жёсткость (мини-модель физики ЭКСП. 04) |
+
+## Библиотека `src/lib/lab/`
+
+### types.ts — контракт демо
+```ts
+interface DemoModule {
+  id: string; title: string; latin: string
+  category: 'fields' | 'shaders' | 'physics' | 'gen'
+  description: string; tech: string
+  params: ParamDef[] // range | toggle | select, с дефолтами
+  create(canvas, params, { reduced }): DemoInstance
+}
+interface DemoInstance {
+  pointer?: { x: number; y: number; down: boolean } // карточка пишет сюда курсор
+  frame(t: number, dt: number): void
+  setParam(key: string, value: ParamValue): void
+  resize?(): void
+  destroy(): void
+}
+```
+Плюс хелперы `numParam/strParam` — безопасное чтение параметров.
+
+### useDemoLoop.ts — lifecycle кадра
+Хук RAF: старт/стоп, автопаууза при `document.hidden`, при `prefers-reduced-motion`
+отрисовывает один кадр. Возвращает управление, не течёт.
+
+### math.ts — процедурная математика
+`mulberry32(seed)` — детерминированный RNG; `hash21`; `valueNoise2D(x, y, octaves)`
+(+fbm); `clamp/lerp/easeOutCubic/TAU`. Все сцены-генераторы (organism, archive, lab)
+используют один и тот же подход: форма = f(seed), seed = f(история/параметры).
+
+### glkit.ts — минимальный WebGL2
+`createFullscreenGL(canvas)` → `{ gl, program(fragSrc), resize(), size(), dispose() }`:
+полноэкранный треугольник из `gl_VertexID` (без буферов), компиляция с общим вершинным
+шейдером и заголовком `#version 300 es`, кэш uniform-локаций, DPR-кап 2. Эталон для
+малых шейдерных сцен без three.js.
+
+## Паттерн «ctx0» (важно при переносе кода)
+
+TypeScript 5.9 не сохраняет null-сужение константы в hoisted-функциях. Поэтому в демо:
+
+```ts
+const ctx0 = canvas.getContext('2d')
+if (!ctx0) return { frame: () => {}, setParam: () => {}, destroy: () => {} }
+const ctx = ctx0 // не-null во всех замыканиях
+```
+
+## Как добавить демо
+
+1. Создать `src/sites/lab/demos/<name>.ts` с `export const nameDemo: DemoModule = {...}`.
+2. Зарегистрировать в `demos/index.ts`.
+3. Проверить: карточка появляется, параметры живые, выход/вход без утечек (console чиста).

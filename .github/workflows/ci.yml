@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Установка зависимостей
+        run: bun install --frozen-lockfile
+
+      - name: Генерация Prisma-клиента
+        run: bun run db:generate
+
+      - name: Линт
+        run: bun run lint
+
+      - name: Типы
+        run: bunx tsc --noEmit
