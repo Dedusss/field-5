@@ -130,6 +130,8 @@ export default function OrganismSite({ onExit }: { onExit: () => void }): React.
     const myTag = `гость #${myId}`
     const others = data.mutations.filter((m) => m.id > prevMax && m.visitor !== myTag)
     if (others.length === 0) return
+    // чужое внимание подогревает ваше: всплеск за каждую партию чужих действий
+    energy.addForeign()
     if (
       others.some((m) => m.kind === 'graft') &&
       Date.now() - lastGraftToastRef.current > 10_000
@@ -548,7 +550,7 @@ export default function OrganismSite({ onExit }: { onExit: () => void }): React.
 
       {/* шкала энергии внимания */}
       <div className="absolute bottom-5 left-4 z-20">
-        <EnergyScale value={energy.value} />
+        <EnergyScale value={energy.value} awake={energy.awake} foreignPulse={energy.foreignPulse} />
       </div>
 
       {/* кнопки действий */}
@@ -558,6 +560,7 @@ export default function OrganismSite({ onExit }: { onExit: () => void }): React.
           canGraft={energy.value >= GRAFT_COST}
           canPulse={energy.value >= PULSE_COST}
           pulseLock={pulseLock}
+          awake={energy.awake}
           onGraft={toggleGraftMode}
           onPulse={doPulse}
           hintRef={hintRef}

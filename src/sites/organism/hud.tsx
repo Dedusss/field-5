@@ -6,8 +6,8 @@
  * Палитра: бездна #05130c / #0c2b1a · свечение #4ef08a · янтарь #e8b34d.
  */
 
-import type { RefObject } from 'react'
 import { memo } from 'react'
+import type { RefObject } from 'react'
 
 export const relTime = (at: number, now: number): string => {
   const s = Math.max(0, Math.floor((now - at) / 1000))
@@ -35,16 +35,24 @@ export function SceneStyles(): React.JSX.Element {
         0%, 100% { opacity: 0.35; }
         50% { opacity: 1; }
       }
+      @keyframes org-foreign {
+        0% { opacity: 0; }
+        12% { opacity: 1; }
+        70% { opacity: 1; }
+        100% { opacity: 0; }
+      }
       .org-tentacle { animation: org-tentacle 1.5s ease-in-out infinite alternate; transform-origin: center bottom; }
       .org-toast { animation: org-toast-in 0.28s ease-out both; }
       .org-pulse-soft { animation: org-pulse-soft 1.6s ease-in-out infinite; }
+      .org-foreign { animation: org-foreign 1.25s ease-out both; }
       .org-scroll { scrollbar-width: thin; scrollbar-color: rgba(78,240,138,0.28) transparent; }
       .org-scroll::-webkit-scrollbar { width: 5px; }
       .org-scroll::-webkit-scrollbar-track { background: transparent; }
       .org-scroll::-webkit-scrollbar-thumb { background: rgba(78,240,138,0.28); border-radius: 3px; }
       .org-scroll::-webkit-scrollbar-thumb:hover { background: rgba(78,240,138,0.5); }
       @media (prefers-reduced-motion: reduce) {
-        .org-tentacle, .org-toast, .org-pulse-soft { animation: none; }
+        .org-tentacle, .org-toast, .org-pulse-soft, .org-foreign { animation: none; }
+        .org-foreign { opacity: 0; }
       }
     `}</style>
   )
@@ -64,6 +72,18 @@ export function ExitButton({ onExit }: { onExit: () => void }): React.JSX.Elemen
   )
 }
 
+/** Стадии зрелости организма: по одной на поколение (5+ — «лес»). */
+const STAGES = ['спора', 'клубок', 'куст', 'крона', 'лес'] as const
+
+/** Порядковое слово для счётчика прививок до следующего поколения. */
+const graftWord = (n: number): string => {
+  const m10 = n % 10
+  const m100 = n % 100
+  if (m10 === 1 && m100 !== 11) return 'прививка'
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'прививки'
+  return 'прививок'
+}
+
 interface HeaderStatsProps {
   generation: number
   grafts: number
@@ -72,6 +92,11 @@ interface HeaderStatsProps {
 }
 
 export function HeaderStats({ generation, grafts, pulses, energy }: HeaderStatsProps): React.JSX.Element {
+  const stage = STAGES[Math.min(Math.max(1, generation), STAGES.length) - 1]
+  const inGen = ((grafts % 12) + 12) % 12
+  const remaining = 12 - inGen
+  const next = generation + 1
+  const pct = Math.round((inGen / 12) * 100)
   return (
     <div className="pointer-events-none">
       <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-[#4ef08a]/75">
@@ -80,9 +105,31 @@ export function HeaderStats({ generation, grafts, pulses, energy }: HeaderStatsP
       <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.3em] text-[#dff5e5]/40">
         поколение
       </p>
-      <p className="font-display text-[42px] leading-[0.95] text-[#dff5e5] [text-shadow:0_0_28px_rgba(78,240,138,0.28)] sm:text-[52px] md:text-[58px]">
-        {String(generation).padStart(2, '0')}
+      <p className="flex items-baseline gap-2.5">
+        <span className="font-display text-[42px] leading-[0.95] text-[#dff5e5] [text-shadow:0_0_28px_rgba(78,240,138,0.28)] sm:text-[52px] md:text-[58px]">
+          {String(generation).padStart(2, '0')}
+        </span>
+        <span className="font-serif text-[17px] italic text-[#e8b34d] [text-shadow:0_0_18px_rgba(232,179,77,0.35)] sm:text-[19px]">
+          {stage}
+        </span>
       </p>
+      {/* зрелость: сколько ветвей отделяет от следующего поколения */}
+      <div className="mt-3 w-[188px] max-w-[56vw]">
+        <div className="relative h-px w-full bg-[#4ef08a]/12">
+          <div
+            className="absolute left-0 top-0 h-px bg-gradient-to-r from-[#2fae63] to-[#4ef08a] shadow-[0_0_8px_rgba(78,240,138,0.45)]"
+            style={{ width: `${pct}%` }}
+          />
+          <span
+            className="absolute -top-[3px] h-[7px] w-px bg-[#4ef08a]/50"
+            style={{ left: '100%', transform: 'translateX(-1px)' }}
+          />
+        </div>
+        <p className="mt-2 font-mono text-[9px] tracking-[0.12em] text-[#8fb89c]/60">
+          до поколения {String(next).padStart(2, '0')} — {remaining}{' '}
+          {graftWord(remaining)}
+        </p>
+      </div>
       <p className="mt-2.5 font-mono text-[10px] tracking-wide text-[#8fb89c]/75">
         ветвей {grafts} · пульсов {pulses} · общая энергия {energy}
       </p>
@@ -92,7 +139,20 @@ export function HeaderStats({ generation, grafts, pulses, energy }: HeaderStatsP
 
 /* ------------------------------ шкала энергии ------------------------------ */
 
-export function EnergyScale({ value }: { value: number }): React.JSX.Element {
+/**
+ * Шкала энергии внимания. Пробуждение (первые 18 с сессии) помечено янтарным
+ * «пульсом»; каждое чужое действие из ленты (всплеск +6) коротко вспыхивает
+ * по шкале янтарным — ключ foreignPulse перезапускает CSS-анимацию.
+ */
+export function EnergyScale({
+  value,
+  awake,
+  foreignPulse,
+}: {
+  value: number
+  awake: boolean
+  foreignPulse: number
+}): React.JSX.Element {
   const pct = Math.max(0, Math.min(100, value))
   return (
     <div className="flex flex-col items-center gap-2">
@@ -107,10 +167,24 @@ export function EnergyScale({ value }: { value: number }): React.JSX.Element {
           className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#1e7a45] via-[#2fae63] to-[#4ef08a] shadow-[0_0_14px_rgba(78,240,138,0.55)]"
           style={{ height: `${pct}%`, transition: 'height 160ms linear' }}
         />
+        {/* чужое внимание: янтарная вспышка поверх зелёной шкалы */}
+        {foreignPulse > 0 && (
+          <span key={foreignPulse} aria-hidden="true" className="org-foreign absolute inset-0">
+            <span className="absolute inset-0 border border-[#e8b34d]/70 bg-[#07150d]/80 shadow-[0_0_16px_rgba(232,179,77,0.35)]" />
+            <span
+              className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#8a6a25] via-[#c69138] to-[#e8b34d] shadow-[0_0_14px_rgba(232,179,77,0.6)]"
+              style={{ height: `${pct}%` }}
+            />
+          </span>
+        )}
         {[40, 100].map((v) => (
           <span
             key={v}
-            className="absolute -right-1 h-px w-2 bg-[#4ef08a]/40"
+            className={
+              v === 40
+                ? 'absolute -right-1 h-px w-2 bg-[#e8b34d]/45'
+                : 'absolute -right-1 h-px w-2 bg-[#4ef08a]/40'
+            }
             style={{ bottom: `${v}%` }}
           />
         ))}
@@ -119,6 +193,19 @@ export function EnergyScale({ value }: { value: number }): React.JSX.Element {
         {value}
       </span>
       <span className="font-mono text-[8px] text-[#5c8a6c]">из 100</span>
+      {awake && (
+        <span className="org-pulse-soft -mt-1 font-mono text-[8px] uppercase tracking-[0.18em] text-[#e8b34d]/90">
+          пробуждение
+        </span>
+      )}
+      {foreignPulse > 0 && (
+        <span
+          key={`t${foreignPulse}`}
+          className="org-foreign -mt-1 font-mono text-[8px] uppercase tracking-[0.18em] text-[#e8b34d]"
+        >
+          +6 чужое внимание
+        </span>
+      )}
     </div>
   )
 }
@@ -130,6 +217,7 @@ interface ActionBarProps {
   canGraft: boolean
   canPulse: boolean
   pulseLock: boolean
+  awake: boolean
   onGraft: () => void
   onPulse: () => void
   hintRef: RefObject<HTMLSpanElement | null>
@@ -141,6 +229,7 @@ export function ActionBar({
   canGraft,
   canPulse,
   pulseLock,
+  awake,
   onGraft,
   onPulse,
   hintRef,
@@ -181,9 +270,11 @@ export function ActionBar({
         <span ref={hintRef}>
           {graftMode
             ? 'клик по существу — точка прививки'
-            : !canGraft
-              ? 'движение пополняет запас'
-              : 'движение и присутствие наполняют энергию внимания'}
+            : awake
+              ? 'пробуждение · шкала наполняется быстрее'
+              : !canGraft
+                ? 'движение пополняет запас'
+                : 'движение и присутствие наполняют энергию внимания'}
         </span>
         <span ref={readoutRef} className="hidden font-mono text-[10px] text-[#e8b34d]/80" />
       </p>
@@ -342,7 +433,8 @@ export function InfoOverlay({ onClose }: { onClose: () => void }): React.JSX.Ele
           прививка каждого гостя записывается в общую базу и навсегда меняет его форму. Всё, что
           вы видите на экране, выросло из действий других людей — а ваши действия останутся в
           организме после того, как вы уйдёте. Существо взрослеет поколениями: каждые двенадцать
-          прививок — новое поколение.
+          прививок — новое поколение, и у каждого своё имя: спора, клубок, куст, крона — и
+          наконец лес.
         </p>
 
         <h3 className="mt-8 font-mono text-[10px] uppercase tracking-[0.3em] text-[#e8b34d]/90">
@@ -360,10 +452,12 @@ export function InfoOverlay({ onClose }: { onClose: () => void }): React.JSX.Ele
         </h3>
         <ol className="mt-3 space-y-1.5 text-[13px] leading-relaxed text-[#cdeed6]/85">
           <li>1. Подвигайте мышью — вертикальная шкала слева начнёт наполняться зелёным светом.</li>
-          <li>2. Накопите 40 и привейте ветвь: выберите точку на теле существа.</li>
-          <li>3. Пошлите пульс — волна вздрогнет по всем ветвям сразу.</li>
-          <li>4. Наведите курсор на ветвь, чтобы узнать, кто её привил и когда.</li>
-          <li>5. Перезагрузите страницу — организм помнит. Откройте сайт в двух вкладках и следите, как чужие прививки прорастают на ваших глазах.</li>
+          <li>2. Первые двадцать секунд — пробуждение: шкала наполняется почти вдвое быстрее обычного.</li>
+          <li>3. Накопите 40 и привейте ветвь: выберите точку на теле существа.</li>
+          <li>4. Пошлите пульс — волна вздрогнет по всем ветвям сразу.</li>
+          <li>5. Держите страницу открытой: чужие прививки из ленты дают всплеск энергии +6.</li>
+          <li>6. Наведите курсор на ветвь, чтобы узнать, кто её привил и когда.</li>
+          <li>7. Перезагрузите страницу — организм помнит. Откройте сайт в двух вкладках и следите, как чужие прививки прорастают на ваших глазах.</li>
         </ol>
 
         <p className="mt-8 border-t border-[#4ef08a]/10 pt-4 font-mono text-[10px] leading-relaxed text-[#5c8a6c]">

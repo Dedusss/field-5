@@ -6,6 +6,12 @@
  * Непрерывное поле яркости переводится в сетку чернильных точек: площадь
  * точки кодирует тон (радиус ~ sqrt), решётка повёрнута на классический
  * печатный угол. Бумага — тёплая, с зерном; краска — одна, как в один прогон.
+ *
+ * Дуотон — второй прогон краски: вторая решётка повёрнута на +30°
+ * (классический сдвиг печатных углов против муара) и печатает
+ * дополнительный тон — инверсию поля. Площадь чернил в сумме постоянна,
+ * как у настоящего дуплекса: где первой краски мало, второй много.
+ *
  * Курсор работает лупой: приближает изображение, не ломая решётку;
  * зажатая кнопка усиливает увеличение.
  */
@@ -13,7 +19,7 @@
 import { clamp, TAU } from '@/lib/lab/math'
 import { numParam, strParam, type DemoInstance, type DemoModule } from '@/lib/lab/types'
 
-/** Краски одного прогона: цвет чернил на тёплой бумаге. */
+/** Краски прогонов: цвет чернил на тёплой бумаге. */
 const INKS: Record<string, string> = {
   ink: '#26201a',
   vermilion: '#b23a1c',
@@ -55,6 +61,7 @@ const SOURCES: Record<string, SourceFn> = {
 const LOUPE_R = 105 // радиус лупы (CSS-px)
 const MAG_HOVER = 2.2 // увеличение при наведённом курсоре
 const MAG_DOWN = 3.4 // увеличение при зажатой кнопке
+const DUOTONE_SHIFT = (30 * Math.PI) / 180 // сдвиг второй решётки против муара
 
 export const halftoneDemo: DemoModule = {
   id: 'halftone',
@@ -62,8 +69,8 @@ export const halftoneDemo: DemoModule = {
   latin: 'HALFTONE',
   category: 'shaders',
   description:
-    'Полутоновой растр, как в газетной печати: непрерывное поле яркости переводится в сетку чернильных точек — площадь точки кодирует тон, решётка повёрнута на классический печатный угол. Курсор работает лупой: приближает изображение, не ломая решётку; зажатая кнопка усиливает увеличение.',
-  tech: 'canvas 2d · повёрнутая решётка растра · радиус ~ sqrt(тон) · варп поля лупой · бумага с зерном',
+    'Полутоновой растр, как в газетной печати: непрерывное поле яркости переводится в сетку чернильных точек — площадь точки кодирует тон, решётка повёрнута на классический печатный угол. В режиме дуотона второй прогон краски печатает инверсию поля со сдвигом решётки на +30°: где первой краски мало, второй много — сумма чернил постоянна, как у настоящего дуплекса. Курсор работает лупой: приближает изображение, не ломая решётку; зажатая кнопка усиливает увеличение.',
+  tech: 'canvas 2d · повёрнутые решётки растра · радиус ~ sqrt(тон) · два прогона краски (дуотон, +30°) · варп поля лупой · бумага с зерном',
   params: [
     {
       key: 'source',
@@ -79,13 +86,34 @@ export const halftoneDemo: DemoModule = {
     { key: 'cell', label: 'Шаг растра', kind: 'range', min: 7, max: 24, step: 1, value: 12 },
     { key: 'angle', label: 'Угол решётки', kind: 'range', min: 0, max: 75, step: 1, value: 45 },
     {
+      key: 'pass',
+      label: 'Прогон',
+      kind: 'select',
+      value: 'single',
+      options: [
+        { value: 'single', label: 'одна краска' },
+        { value: 'duotone', label: 'дуотон' },
+      ],
+    },
+    {
       key: 'ink',
-      label: 'Краска',
+      label: 'Краска 1',
       kind: 'select',
       value: 'ink',
       options: [
         { value: 'ink', label: 'чернила' },
         { value: 'vermilion', label: 'киноварь' },
+        { value: 'ochre', label: 'охра' },
+      ],
+    },
+    {
+      key: 'ink2',
+      label: 'Краска 2',
+      kind: 'select',
+      value: 'vermilion',
+      options: [
+        { value: 'vermilion', label: 'киноварь' },
+        { value: 'ink', label: 'чернила' },
         { value: 'ochre', label: 'охра' },
       ],
     },
@@ -103,7 +131,9 @@ export const halftoneDemo: DemoModule = {
     let sourceFn = SOURCES[sourceKey] ?? SOURCES.interference
     let cell = numParam(params, 'cell', 12)
     let angleDeg = numParam(params, 'angle', 45)
+    let passKey = strParam(params, 'pass', 'single')
     let inkKey = strParam(params, 'ink', 'ink')
+    let ink2Key = strParam(params, 'ink2', 'vermilion')
 
     let w = 1
     let h = 1
@@ -180,13 +210,12 @@ export const halftoneDemo: DemoModule = {
       return clamp(sourceFn(sx, sy, w, h, t), 0, 1)
     }
 
-    function render(t: number): void {
-      if (w < 2 || h < 2) return
-      // лист
-      if (paperCtx) ctx.drawImage(paper, 0, 0, w, h)
-
-      // решётка растра: ортогональный базис, повёрнутый на угол
-      const theta = (angleDeg * Math.PI) / 180
+    /**
+     * Один прогон краски: решётка растра под углом theta, точки радиусом
+     * ~ rMax·sqrt(тон). Печатается поверх предыдущего прогона — как на
+     * машине, вторая краска ложится сверху.
+     */
+    function drawPass(theta: number, color: string, tone: (v: number) => number, t: number): void {
       const cos = Math.cos(theta)
       const sin = Math.sin(theta)
       // rMax подобран так, чтобы площадь чернил соответствовала тону:
@@ -213,26 +242,42 @@ export const halftoneDemo: DemoModule = {
         if (b > bMax) bMax = b
       }
 
-      ctx.fillStyle = INKS[inkKey] ?? INKS.ink
+      ctx.fillStyle = color
       ctx.beginPath()
       for (let jb = Math.floor(bMin); jb <= Math.ceil(bMax); jb++) {
         for (let ia = Math.floor(aMin); ia <= Math.ceil(aMax); ia++) {
           const x = (ia * cos - jb * sin) * cell
           const y = (ia * sin + jb * cos) * cell
           if (x < -cell || x > w + cell || y < -cell || y > h + cell) continue
-          const v = sample(x, y, t)
+          const v = tone(sample(x, y, t))
           // площадь точки кодирует тон: радиус ~ sqrt — как у печатного растра
-          const r = rMax * Math.sqrt(v)
+          const r = rMax * Math.sqrt(Math.max(0, v))
           if (r < 0.35) continue
           ctx.moveTo(x + r, y)
           ctx.arc(x, y, r, 0, TAU)
         }
       }
       ctx.fill()
+    }
 
-      // кольцо лупы: тонкая чернильная окружность вокруг курсора
+    function render(t: number): void {
+      if (w < 2 || h < 2) return
+      // лист
+      if (paperCtx) ctx.drawImage(paper, 0, 0, w, h)
+
+      const theta = (angleDeg * Math.PI) / 180
+      drawPass(theta, INKS[inkKey] ?? INKS.ink, (v) => v, t)
+
+      // второй прогон: инверсия тона на решётке +30° — сумма чернил постоянна
+      if (passKey === 'duotone') {
+        drawPass(theta + DUOTONE_SHIFT, INKS[ink2Key] ?? INKS.vermilion, (v) => 1 - v, t)
+      }
+
+      // кольцо лупы: тонкая окружность вокруг курсора; в дуотоне — цветом
+      // второй краски, чтобы прямо под курсором читались обе пластины
       if (pointer.x > -1000 && pointer.y > -1000) {
-        ctx.strokeStyle = INKS[inkKey] ?? INKS.ink
+        ctx.strokeStyle =
+          passKey === 'duotone' ? (INKS[ink2Key] ?? INKS.vermilion) : (INKS[inkKey] ?? INKS.ink)
         ctx.globalAlpha = 0.38
         ctx.lineWidth = 1
         ctx.beginPath()
@@ -261,8 +306,12 @@ export const halftoneDemo: DemoModule = {
           cell = value
         } else if (key === 'angle' && typeof value === 'number') {
           angleDeg = value
+        } else if (key === 'pass' && typeof value === 'string') {
+          passKey = value
         } else if (key === 'ink' && typeof value === 'string') {
           inkKey = value
+        } else if (key === 'ink2' && typeof value === 'string') {
+          ink2Key = value
         }
       },
       resize,
