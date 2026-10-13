@@ -407,6 +407,18 @@ export class TextFieldScene {
     this.pointer.vy = 0
   }
 
+  private onBlur = (): void => {
+    // окно потеряло фокус в середине драга — отпускаем захваченное,
+    // иначе глиф остаётся приклеенным к «призраку» курсора
+    if (this.dragging) {
+      this.currentAct()?.pointerUp({ x: 0, y: 0 })
+      this.dragging = false
+      this.setDragCursor(false)
+    }
+    this.pointer.down = false
+    this.swipeStart = null
+  }
+
   private onWheel = (e: WheelEvent): void => {
     e.preventDefault()
     const now = performance.now()
@@ -448,6 +460,9 @@ export class TextFieldScene {
     this.canvas.addEventListener('pointerleave', this.onPointerLeave)
     this.canvas.addEventListener('wheel', this.onWheel, { passive: false })
     window.addEventListener('keydown', this.onKey)
+    // страховка: отпускание за пределами канваса (если setPointerCapture не сработал)
+    window.addEventListener('pointerup', this.onPointerUp)
+    window.addEventListener('blur', this.onBlur)
     this.installQaHook()
   }
 
@@ -459,6 +474,8 @@ export class TextFieldScene {
     this.canvas.removeEventListener('pointerleave', this.onPointerLeave)
     this.canvas.removeEventListener('wheel', this.onWheel)
     window.removeEventListener('keydown', this.onKey)
+    window.removeEventListener('pointerup', this.onPointerUp)
+    window.removeEventListener('blur', this.onBlur)
   }
 
   // ——— фактура ———

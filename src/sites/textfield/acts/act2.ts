@@ -85,28 +85,26 @@ export class ActCloth implements Act {
     const curveY = (t: number, s: number): number =>
       hookY + s * 4 * t * (1 - t)
 
-    // раскладка: x пропорционально естественным ширинам глифов
-    const chars: { char: string; frac: number }[] = []
+    // раскладка: x пропорционально естественным ширинам глифов;
+    // центр глифа — в середине своегоAdvance, чтобы крайние глифы
+    // не совпадали с крюками (нулевой сегмент = мгновенный разрыв)
+    const chars: { char: string; adv: number }[] = []
     let totalAdv = 0
     for (const ch of SENTENCE) {
       const adv =
         ch === ' ' ? size * 0.5 : atlas.measure(ch, size, WEIGHT).advance
-      chars.push({ char: ch, frac: adv })
+      chars.push({ char: ch, adv })
       totalAdv += adv
     }
     let advCursor = 0
     const layout: { char: string; x: number; y: number }[] = []
-    chars.forEach((c, i) => {
-      const t = totalAdv > 0 ? advCursor / totalAdv : 0
+    for (const c of chars) {
+      const t = totalAdv > 0 ? (advCursor + c.adv / 2) / totalAdv : 0
       const px = x1 + span * t
       const py = curveY(t, startSag)
       layout.push({ char: c.char, x: px, y: py })
-      advCursor += c.frac
-      if (i === chars.length - 1) {
-        // крайняя точка доводится до второго крюка
-        layout[layout.length - 1].x = x2
-      }
-    })
+      advCursor += c.adv
+    }
 
     const chain = this.chain
     chain.addPoint(x1, hookY, null, true)

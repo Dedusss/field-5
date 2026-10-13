@@ -83,7 +83,8 @@ export class VerletChain {
     const l: VLink = {
       a,
       b,
-      rest: rest ?? Math.hypot(pb.x - pa.x, pb.y - pa.y),
+      // защита от вырожденных сегментов: нулевой длины покоя не бывает
+      rest: Math.max(rest ?? Math.hypot(pb.x - pa.x, pb.y - pa.y), 2),
       broken: false,
     }
     this.links.push(l)
@@ -173,43 +174,44 @@ export class VerletChain {
     pb.y -= dy * diff * (wb / s) * k
   }
 
-  /** Пересчёт связности от крюков: всё, что больше не держится, — отрыв. */
+  /** Пересчёт связности от крюков: всё, что больше не держится, — отрыв.
+   *
+   * Ссылки хранят индексы массива точек (l.a/l.b), поэтому и обход графа
+   * ведём в индексах — смешение с point.id (1-based) давало ложные отрывы.
+   */
   private refreshDetachment(): void {
-    const connected = new Set<number>()
-    const stack: VPoint[] = []
-    for (const p of this.points) {
-      if (p.pinned && !p.detached) {
-        connected.add(p.id)
-        stack.push(p)
+    const n = this.points.length
+    const connected = new Array<boolean>(n).fill(false)
+    const stack: number[] = []
+    for (let i = 0; i < n; i++) {
+      if (this.points[i].pinned && !this.points[i].detached) {
+        connected[i] = true
+        stack.push(i)
       }
     }
-    const adj = new Map<number, number[]>()
+    const adj: number[][] = new Array(n)
+    for (let i = 0; i < n; i++) adj[i] = []
     for (const l of this.links) {
       if (l.broken) continue
       const pa = this.points[l.a]
       const pb = this.points[l.b]
       if (pa.detached || pb.detached) continue
-      const la = adj.get(l.a)
-      if (la) la.push(l.b)
-      else adj.set(l.a, [l.b])
-      const lb = adj.get(l.b)
-      if (lb) lb.push(l.a)
-      else adj.set(l.b, [l.a])
+      adj[l.a].push(l.b)
+      adj[l.b].push(l.a)
     }
     while (stack.length) {
-      const p = stack.pop() as VPoint
-      const neighbors = adj.get(p.id)
-      if (!neighbors) continue
-      for (const nid of neighbors) {
-        if (!connected.has(nid)) {
-          connected.add(nid)
-          stack.push(this.points[nid])
+      const i = stack.pop() as number
+      for (const j of adj[i]) {
+        if (!connected[j]) {
+          connected[j] = true
+          stack.push(j)
         }
       }
     }
     this.newlyDetached.length = 0
-    for (const p of this.points) {
-      if (!p.pinned && !p.detached && !connected.has(p.id)) {
+    for (let i = 0; i < n; i++) {
+      const p = this.points[i]
+      if (!p.pinned && !p.detached && !connected[i]) {
         p.detached = true
         this.newlyDetached.push(p)
       }
