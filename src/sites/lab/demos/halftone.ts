@@ -12,6 +12,11 @@
  * дополнительный тон — инверсию поля. Площадь чернил в сумме постоянна,
  * как у настоящего дуплекса: где первой краски мало, второй много.
  *
+ * Трихромия — третий прогон: тон разложен на три пластины (тени, средние
+ * тона, света), сумма чернил по-прежнему постоянна. Углы решёток +30°
+ * и +60°: при базовом 45° получается классическая тройка 15/45/75°
+ * трёхцветной печати.
+ *
  * Курсор работает лупой: приближает изображение, не ломая решётку;
  * зажатая кнопка усиливает увеличение.
  */
@@ -62,6 +67,7 @@ const LOUPE_R = 105 // радиус лупы (CSS-px)
 const MAG_HOVER = 2.2 // увеличение при наведённом курсоре
 const MAG_DOWN = 3.4 // увеличение при зажатой кнопке
 const DUOTONE_SHIFT = (30 * Math.PI) / 180 // сдвиг второй решётки против муара
+const TRICHROME_SHIFT = (60 * Math.PI) / 180 // угол третьей решётки (классика 15/45/75)
 
 export const halftoneDemo: DemoModule = {
   id: 'halftone',
@@ -69,8 +75,8 @@ export const halftoneDemo: DemoModule = {
   latin: 'HALFTONE',
   category: 'shaders',
   description:
-    'Полутоновой растр, как в газетной печати: непрерывное поле яркости переводится в сетку чернильных точек — площадь точки кодирует тон, решётка повёрнута на классический печатный угол. В режиме дуотона второй прогон краски печатает инверсию поля со сдвигом решётки на +30°: где первой краски мало, второй много — сумма чернил постоянна, как у настоящего дуплекса. Курсор работает лупой: приближает изображение, не ломая решётку; зажатая кнопка усиливает увеличение.',
-  tech: 'canvas 2d · повёрнутые решётки растра · радиус ~ sqrt(тон) · два прогона краски (дуотон, +30°) · варп поля лупой · бумага с зерном',
+    'Полутоновой растр, как в газетной печати: непрерывное поле яркости переводится в сетку чернильных точек — площадь точки кодирует тон, решётка повёрнута на классический печатный угол. В режиме дуотона второй прогон краски печатает инверсию поля со сдвигом решётки на +30°: где первой краски мало, второй много — сумма чернил постоянна, как у настоящего дуплекса. Трихромия раскладывает тон на три пластины — тени, средние тона, света — тремя красками под углами +30° и +60°: при базовом угле 45° получается классическая тройка 15/45/75° трёхцветной печати. Курсор работает лупой: приближает изображение, не ломая решётку; зажатая кнопка усиливает увеличение.',
+  tech: 'canvas 2d · повёрнутые решётки растра · радиус ~ sqrt(тон) · до трёх прогонов краски (дуотон +30°, трихромия +60°) · варп поля лупой · бумага с зерном и метками реза',
   params: [
     {
       key: 'source',
@@ -93,6 +99,7 @@ export const halftoneDemo: DemoModule = {
       options: [
         { value: 'single', label: 'одна краска' },
         { value: 'duotone', label: 'дуотон' },
+        { value: 'trichrome', label: 'трихромия' },
       ],
     },
     {
@@ -117,6 +124,17 @@ export const halftoneDemo: DemoModule = {
         { value: 'ochre', label: 'охра' },
       ],
     },
+    {
+      key: 'ink3',
+      label: 'Краска 3',
+      kind: 'select',
+      value: 'ochre',
+      options: [
+        { value: 'ochre', label: 'охра' },
+        { value: 'vermilion', label: 'киноварь' },
+        { value: 'ink', label: 'чернила' },
+      ],
+    },
   ],
   create(canvas, params, opts) {
     const ctx0 = canvas.getContext('2d')
@@ -134,6 +152,7 @@ export const halftoneDemo: DemoModule = {
     let passKey = strParam(params, 'pass', 'single')
     let inkKey = strParam(params, 'ink', 'ink')
     let ink2Key = strParam(params, 'ink2', 'vermilion')
+    let ink3Key = strParam(params, 'ink3', 'ochre')
 
     let w = 1
     let h = 1
@@ -266,18 +285,60 @@ export const halftoneDemo: DemoModule = {
       if (paperCtx) ctx.drawImage(paper, 0, 0, w, h)
 
       const theta = (angleDeg * Math.PI) / 180
-      drawPass(theta, INKS[inkKey] ?? INKS.ink, (v) => v, t)
 
-      // второй прогон: инверсия тона на решётке +30° — сумма чернил постоянна
-      if (passKey === 'duotone') {
-        drawPass(theta + DUOTONE_SHIFT, INKS[ink2Key] ?? INKS.vermilion, (v) => 1 - v, t)
+      if (passKey === 'trichrome') {
+        // трихромия: тон разложен на три пластины — тени / средние / света,
+        // сумма чернил постоянна; углы +30° и +60° (при 45° — классика 15/45/75)
+        drawPass(theta, INKS[inkKey] ?? INKS.ink, (v) => clamp(2 * v - 1, 0, 1), t)
+        drawPass(
+          theta + DUOTONE_SHIFT,
+          INKS[ink2Key] ?? INKS.vermilion,
+          (v) => 1 - Math.abs(2 * v - 1),
+          t,
+        )
+        drawPass(theta + TRICHROME_SHIFT, INKS[ink3Key] ?? INKS.ochre, (v) => clamp(1 - 2 * v, 0, 1), t)
+      } else {
+        drawPass(theta, INKS[inkKey] ?? INKS.ink, (v) => v, t)
+
+        // второй прогон: инверсия тона на решётке +30° — сумма чернил постоянна
+        if (passKey === 'duotone') {
+          drawPass(theta + DUOTONE_SHIFT, INKS[ink2Key] ?? INKS.vermilion, (v) => 1 - v, t)
+        }
       }
 
+      // метки реза: угловые скобы печатного листа — как у оттиска
+      // под рез; цветом основной краски, полупрозрачно
+      ctx.strokeStyle = INKS[inkKey] ?? INKS.ink
+      ctx.globalAlpha = 0.65
+      ctx.lineWidth = 1
+      const inset = Math.max(7, Math.min(12, w * 0.035)) // отступ скобы от края листа
+      const arm = Math.max(10, Math.min(20, w * 0.06)) // длина плеча скобы
+      ctx.beginPath()
+      // (x, y) — угол скобы, плечи тянутся внутрь листа
+      const brackets: [number, number, number, number][] = [
+        [inset, inset, 1, 1],
+        [w - inset, inset, -1, 1],
+        [inset, h - inset, 1, -1],
+        [w - inset, h - inset, -1, -1],
+      ]
+      for (const [bx, by, sx, sy] of brackets) {
+        ctx.moveTo(bx + sx * arm, by)
+        ctx.lineTo(bx, by)
+        ctx.lineTo(bx, by + sy * arm)
+      }
+      ctx.stroke()
+      ctx.globalAlpha = 1
+
       // кольцо лупы: тонкая окружность вокруг курсора; в дуотоне — цветом
-      // второй краски, чтобы прямо под курсором читались обе пластины
+      // второй краски, в трихромии — третьей, чтобы под курсором читались
+      // обе дополнительные пластины
       if (pointer.x > -1000 && pointer.y > -1000) {
         ctx.strokeStyle =
-          passKey === 'duotone' ? (INKS[ink2Key] ?? INKS.vermilion) : (INKS[inkKey] ?? INKS.ink)
+          passKey === 'trichrome'
+            ? (INKS[ink3Key] ?? INKS.ochre)
+            : passKey === 'duotone'
+              ? (INKS[ink2Key] ?? INKS.vermilion)
+              : (INKS[inkKey] ?? INKS.ink)
         ctx.globalAlpha = 0.38
         ctx.lineWidth = 1
         ctx.beginPath()
@@ -312,6 +373,8 @@ export const halftoneDemo: DemoModule = {
           inkKey = value
         } else if (key === 'ink2' && typeof value === 'string') {
           ink2Key = value
+        } else if (key === 'ink3' && typeof value === 'string') {
+          ink3Key = value
         }
       },
       resize,

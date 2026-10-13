@@ -9,7 +9,7 @@
  * футер прижат (flex-col + mt-auto + safe-area).
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Activity, ArrowUpRight } from 'lucide-react'
 import { LAB_META, SITES, type SiteMeta } from '@/sites/manifest'
@@ -57,6 +57,46 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null)
   const [organism, setOrganism] = useState<OrganismStats | null>(null)
 
+  /* Сколь-спай и индикатор чтения: прогресс — мутацией стиля по ref
+     (без ре-рендера на каждый кадр), активный раздел — редким setState */
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const barRef = useRef<HTMLDivElement | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let raf = 0
+    const onScroll = (): void => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        // индикатор чтения: доля пройденного скролла
+        const denom = el.scrollHeight - el.clientHeight
+        const p = denom > 0 ? Math.min(1, Math.max(0, el.scrollTop / denom)) : 0
+        if (barRef.current) barRef.current.style.transform = `scaleX(${p})`
+        // сколь-спай: активен последний раздел, чья голова ушла за шапку
+        const rootTop = el.getBoundingClientRect().top
+        let current: string | null = null
+        for (const item of NAV) {
+          const sec = document.getElementById(item.id)
+          if (sec && sec.getBoundingClientRect().top - rootTop <= 140) current = item.id
+        }
+        // у самого низа — последний раздел, даже если голова не доехала
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) {
+          current = NAV[NAV.length - 1].id
+        }
+        setActiveId((prev) => (prev === current ? prev : current))
+      })
+    }
+    onScroll()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
+
   /* Живые данные: только при монтировании, setState — в промис-колбэках */
   useEffect(() => {
     let alive = true
@@ -93,7 +133,10 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
   const maxVisits = telemetry ? Math.max(1, ...Object.values(telemetry.sites ?? {})) : 1
 
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto overflow-x-hidden bg-[#0b0a09] font-sans text-[#ece7dd]">
+    <div
+      ref={scrollRef}
+      className="fixed inset-0 z-40 overflow-y-auto overflow-x-hidden bg-[#0b0a09] font-sans text-[#ece7dd]"
+    >
       <div className="relative flex min-h-full flex-col">
         {/* Тёплое свечение над героем */}
         <div
@@ -120,17 +163,42 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
               </span>
             </div>
             <nav className="flex flex-wrap items-center gap-0.5 md:ml-auto" aria-label="Разделы отчёта">
-              {NAV.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => scrollToId(item.id)}
-                  className="rounded-sm px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8b8175] transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6]"
-                >
-                  {item.label}
-                </button>
-              ))}
+              {NAV.map((item) => {
+                const isActive = activeId === item.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-current={isActive ? 'true' : undefined}
+                    onClick={() => scrollToId(item.id)}
+                    className={`relative rounded-sm px-2.5 pb-2.5 pt-2 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] ${
+                      isActive ? 'text-[#d9a05b]' : 'text-[#8b8175]'
+                    }`}
+                  >
+                    {item.label}
+                    {isActive &&
+                      (reducedMotion ? (
+                        <span aria-hidden className="absolute inset-x-2 bottom-0.5 h-px bg-[#d9a05b]" />
+                      ) : (
+                        /* чернильное тире скользит между разделами (общий layoutId) */
+                        <motion.span
+                          aria-hidden
+                          layoutId="rep-nav-ink"
+                          className="absolute inset-x-2 bottom-0.5 h-px bg-[#d9a05b]"
+                          transition={{ duration: 0.3, ease: 'easeOut' }}
+                        />
+                      ))}
+                  </button>
+                )
+              })}
             </nav>
+          </div>
+          {/* Индикатор чтения: янтарная чернила на линейке рамки */}
+          <div aria-hidden className="absolute inset-x-0 bottom-0 h-[2px] bg-white/[0.04]">
+            <div
+              ref={barRef}
+              className="h-full origin-left bg-gradient-to-r from-[#d9a05b]/60 to-[#d9a05b] [transform:scaleX(0)]"
+            />
           </div>
         </header>
 
