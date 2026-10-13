@@ -1,11 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { animate, motion, useReducedMotion } from 'framer-motion'
-import { ArrowUpRight, FlaskConical, FileSearch, Activity } from 'lucide-react'
+import { ArrowUpRight, FlaskConical, FileSearch, Activity, Volume2, VolumeX } from 'lucide-react'
 import { SITES, LAB_META, REPORT_META, type SiteMeta } from '@/sites/manifest'
 import { SitePreviewCanvas, type PreviewKind } from '@/sites/hub/previews'
 import BackDrop from '@/sites/hub/BackDrop'
+import {
+  getServerHubSound,
+  hubSoundOn,
+  hubTick,
+  setHubSound,
+  subscribeHubSound,
+} from '@/sites/hub/sound'
 import type { RouteSlug } from '@/lib/router'
 
 interface Telemetry {
@@ -30,6 +37,14 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
   const posRef = useRef<{ x: number; y: number } | null>(null)
   /* счётчик для count-up телеметрии (null = без анимации) */
   const [shownTotal, setShownTotal] = useState<number | null>(null)
+  /* телеграфный отклик — внешнее хранилище модуля sound.ts:
+     подписка читает localStorage после монтирования, тумблер/клавиша M
+     меняют состояние там же — без зеркального стейта и без эффекта */
+  const soundOn = useSyncExternalStore(subscribeHubSound, hubSoundOn, getServerHubSound)
+
+  const toggleSound = useCallback(() => {
+    setHubSound(!hubSoundOn()) /* localStorage + уведомление подписчиков */
+  }, [])
 
   useEffect(() => {
     fetch('/api/telemetry')
@@ -42,9 +57,9 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
       .catch(() => {})
   }, [])
 
-  /* Клавиатурные короткие пути: 1–5 — эксперименты, R — отчёт, L — лаборатория.
-     Модификаторы не перехватываем (Ctrl+R и пр. остаются браузеру),
-     поля ввода не трогаем. Слушатель живёт, пока смонтирован хаб. */
+  /* Клавиатурные короткие пути: 1–5 — эксперименты, R — отчёт, L — лаборатория,
+     M — тумблер звука. Модификаторы не перехватываем (Ctrl+R и пр. остаются
+     браузеру), поля ввода не трогаем. Слушатель живёт, пока смонтирован хаб. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return
@@ -52,16 +67,24 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       const n = Number.parseInt(e.key, 10)
       if (Number.isInteger(n) && n >= 1 && n <= SITES.length) {
+        hubTick('press')
         navigate(SITES[n - 1].slug as RouteSlug)
         return
       }
       const k = e.key.toLowerCase()
-      if (k === 'r') navigate('report')
-      else if (k === 'l') navigate('lab')
+      if (k === 'r') {
+        hubTick('press')
+        navigate('report')
+      } else if (k === 'l') {
+        hubTick('press')
+        navigate('lab')
+      } else if (k === 'm') {
+        toggleSound()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate])
+  }, [navigate, toggleSound])
 
   /* Count-up «сцен открыто»: цифра вырастает из нуля (в reduced-motion — сразу) */
   useEffect(() => {
@@ -112,6 +135,8 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
     else if (e.key === 'End') target = rows.length - 1
     if (target === null) return
     e.preventDefault()
+    /* ход по списку — машинописный тик */
+    hubTick('hover')
     const row = rows[target as number]
     row.focus()
     /* подводим строку в поле зрения, если фокус ушёл за складку */
@@ -152,16 +177,37 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
               Эксперименты
             </button>
             <button
-              onClick={() => navigate('report')}
-              className="rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] outline-offset-4 transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]"
+              onClick={() => {
+                hubTick('press')
+                navigate('report')
+              }}
+              className="rounded-sm px-2.5 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] outline-offset-4 transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b] sm:px-3"
             >
               Отчёт
             </button>
             <button
-              onClick={() => navigate('lab')}
-              className="rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] outline-offset-4 transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]"
+              onClick={() => {
+                hubTick('press')
+                navigate('lab')
+              }}
+              className="rounded-sm px-2.5 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] outline-offset-4 transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b] sm:px-3"
             >
               Лаборатория
+            </button>
+            {/* Тумблер телеграфного отклика: по умолчанию выключен (тихий вход),
+                выбор переживает перезагрузку; дублируется клавишей M */}
+            <button
+              onClick={toggleSound}
+              aria-pressed={soundOn}
+              aria-label={soundOn ? 'Выключить звук хаба' : 'Включить звук хаба'}
+              title="Звук хаба (M)"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm outline-offset-4 transition-colors hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]"
+            >
+              {soundOn ? (
+                <Volume2 className="h-4 w-4 text-[#d9a05b]" aria-hidden />
+              ) : (
+                <VolumeX className="h-4 w-4 text-[#8b8175]" aria-hidden />
+              )}
             </button>
           </nav>
         </div>
@@ -238,7 +284,7 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
 
           {/* Подсказка клавиатурного входа (только десктоп) */}
           <p className="mb-6 hidden font-mono text-[10px] uppercase tracking-[0.18em] text-[#5e574c] sm:block">
-            Клавиатура: 1–5 — открыть эксперимент · R — отчёт · L — лаборатория · ↑↓ — по списку
+            Клавиатура: 1–5 — открыть эксперимент · R — отчёт · L — лаборатория · M — звук · ↑↓ — по списку
           </p>
 
           <div
@@ -296,7 +342,10 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
         {/* Отчёт и лаборатория */}
         <section className="mx-auto grid max-w-[1440px] gap-4 px-5 pb-20 md:grid-cols-2 md:px-10">
           <button
-            onClick={() => navigate('report')}
+            onClick={() => {
+              hubTick('press')
+              navigate('report')
+            }}
             className="group relative overflow-hidden rounded-lg border border-white/[0.09] bg-white/[0.02] p-7 text-left outline-offset-[-3px] transition-colors hover:border-[#d9a05b]/40 hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]/70 md:p-9"
           >
             <FileSearch className="mb-5 h-5 w-5 text-[#d9a05b]" />
@@ -313,7 +362,10 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
             </span>
           </button>
           <button
-            onClick={() => navigate('lab')}
+            onClick={() => {
+              hubTick('press')
+              navigate('lab')
+            }}
             className="group relative overflow-hidden rounded-lg border border-white/[0.09] bg-white/[0.02] p-7 text-left outline-offset-[-3px] transition-colors hover:border-[#e8b34d]/40 hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#e8b34d]/70 md:p-9"
           >
             <FlaskConical className="mb-5 h-5 w-5 text-[#e8b34d]" />
@@ -396,7 +448,11 @@ function ProjectRow({
   return (
     <motion.button
       onClick={onEnter}
-      onMouseEnter={() => onHover(site.slug)}
+      onMouseEnter={() => {
+        /* машинописный тик — только на мыши; клавиатурный ход звучит в onListKeyDown */
+        hubTick('hover')
+        onHover(site.slug)
+      }}
       onFocus={(e) => {
         /* клавиатурный фокус: якорим превью-панель к строке */
         if (e.currentTarget.matches(':focus-visible')) onAnchorRow(e.currentTarget.getBoundingClientRect())

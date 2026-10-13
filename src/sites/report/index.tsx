@@ -87,6 +87,23 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
           current = NAV[NAV.length - 1].id
         }
         setActiveId((prev) => (prev === current ? prev : current))
+        // параллакс подписей-пластин витрины: пластина скользит внутри своей
+        // рамы чуть медленнее листа — как несовмещённый печатный прогон.
+        // Мутация transform по классам, ре-рендеров нет; в reduced-motion — стоп.
+        if (!reducedMotion) {
+          const vh = window.innerHeight
+          const frames = el.querySelectorAll<HTMLElement>('.rep-sig-frame')
+          for (const frame of frames) {
+            const r = frame.getBoundingClientRect()
+            if (r.bottom < -60 || r.top > vh + 60) continue
+            const raw = (r.top + r.height / 2 - vh / 2) / (vh / 2) /* −1…1 */
+            const rel = Math.max(-1, Math.min(1, raw))
+            const sig = frame.firstElementChild
+            if (sig instanceof HTMLElement) {
+              sig.style.transform = `translateY(${(-rel * 7).toFixed(1)}px) scale(1.3)`
+            }
+          }
+        }
       })
     }
     onScroll()
@@ -95,7 +112,7 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
       el.removeEventListener('scroll', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [])
+  }, [reducedMotion])
 
   /* Живые данные: только при монтировании, setState — в промис-колбэках */
   useEffect(() => {
@@ -448,13 +465,16 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
           {/* 04 · НАХОДКИ */}
           <section
             id="findings"
-            className="mx-auto max-w-[1440px] scroll-mt-28 px-5 pb-20 md:scroll-mt-20 md:px-10"
+            className="relative mx-auto max-w-[1440px] scroll-mt-28 px-5 pb-20 md:scroll-mt-20 md:px-10"
           >
             <SectionHead
               index="04"
               title="Находки и ограничения"
               note="этап IX · протокол испытаний"
             />
+            {/* Печать полевых испытаний: прикатывается к протоколу, когда раздел входит
+                в поле зрения (мобильный — в потоке по центру, десктоп — на углу карты) */}
+            <FindingStamp reduced={reducedMotion} />
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-lg border border-[#d9a05b]/20 bg-[#d9a05b]/[0.03] p-6 md:p-8">
                 <h3 className="font-serif text-2xl italic text-[#f2e3c6]">Что сработало</h3>
@@ -624,20 +644,120 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
 
 /* ------------------------------------------------------------------ */
 
-function SectionHead({ index, title, note }: { index: string; title: string; note?: string }) {
+/* Печать «испытано»: круглая янтарная печать с текстом по дуге.
+   Появляется ударом — масштаб из переусиления, blur сходит, лёгкий
+   наклон, как у штампа на бумаге; в reduced-motion — сразу оттиснута. */
+function FindingStamp({ reduced }: { reduced: boolean }) {
   return (
-    <div className="mb-8 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-white/[0.07] pb-5 md:mb-10">
-      <div className="flex items-baseline gap-4">
+    <motion.div
+      initial={reduced ? false : { scale: 1.7, opacity: 0, rotate: 3, filter: 'blur(5px)' }}
+      whileInView={{ scale: 1, opacity: 1, rotate: -11, filter: 'blur(0px)' }}
+      viewport={{ once: true, margin: '-90px' }}
+      transition={{ type: 'spring', stiffness: 340, damping: 24, mass: 0.9 }}
+      className="pointer-events-none z-10 mx-auto my-7 block w-[150px] md:absolute md:right-12 md:top-24 md:my-0 md:mx-0 md:w-[168px]"
+    >
+      <svg
+        viewBox="0 0 170 170"
+        role="img"
+        aria-label="Печать: полевые испытания FIELD·5 завершены"
+        className="block w-full opacity-90"
+      >
+        <defs>
+          <path
+            id="rep-seal-arc"
+            d="M85 85 m-57 0 a57 57 0 1 1 114 0 a57 57 0 1 1 -114 0"
+            fill="none"
+          />
+        </defs>
+        <circle cx="85" cy="85" r="82" fill="none" stroke="#d9a05b" strokeWidth="2.5" opacity="0.95" />
+        <circle
+          cx="85"
+          cy="85"
+          r="73"
+          fill="none"
+          stroke="#d9a05b"
+          strokeWidth="1"
+          strokeDasharray="1.5 4"
+          opacity="0.75"
+        />
+        <circle cx="85" cy="85" r="45" fill="none" stroke="#d9a05b" strokeWidth="1" opacity="0.65" />
+        <text fill="#d9a05b" fontSize="9.5" letterSpacing="2.8" className="font-mono">
+          <textPath href="#rep-seal-arc">ПОЛЕВЫЕ ИСПЫТАНИЯ · FIELD·5 · 2026 ·</textPath>
+        </text>
+        <text
+          x="85"
+          y="78"
+          textAnchor="middle"
+          fill="#d9a05b"
+          fontSize="9"
+          letterSpacing="2.2"
+          className="font-mono"
+        >
+          ИСПЫТАНО
+        </text>
+        <text
+          x="85"
+          y="109"
+          textAnchor="middle"
+          fill="#d9a05b"
+          fontSize="28"
+          className="font-display font-semibold"
+        >
+          F·5
+        </text>
+        <text
+          x="85"
+          y="126"
+          textAnchor="middle"
+          fill="#d9a05b"
+          fontSize="7.5"
+          letterSpacing="2"
+          className="font-mono"
+          opacity="0.8"
+        >
+          ЭТАП IX
+        </text>
+      </svg>
+    </motion.div>
+  )
+}
+
+function SectionHead({ index, title, note }: { index: string; title: string; note?: string }) {
+  const reduced = useReducedMotion() ?? false
+  return (
+    <div className="relative mb-8 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 pb-5 md:mb-10">
+      <motion.div
+        initial={reduced ? false : { opacity: 0, y: 14 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-40px' }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="flex flex-wrap items-baseline gap-4"
+      >
         <span className="font-mono text-[11px] tracking-[0.2em] text-[#d9a05b]">{index}</span>
         <h2 className="font-serif text-[clamp(1.7rem,3.4vw,2.5rem)] font-medium italic leading-tight tracking-tight text-[#f2e3c6]">
           {title}
         </h2>
-      </div>
+      </motion.div>
       {note && (
-        <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-[#5e574c]">
+        <motion.span
+          initial={reduced ? false : { opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: '-40px' }}
+          transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
+          className="font-mono text-[9px] uppercase tracking-[0.22em] text-[#5e574c]"
+        >
           {note}
-        </span>
+        </motion.span>
       )}
+      {/* чернильная линейка раздела прочерчивается слева направо */}
+      <motion.span
+        aria-hidden
+        initial={reduced ? false : { scaleX: 0 }}
+        whileInView={{ scaleX: 1 }}
+        viewport={{ once: true, margin: '-40px' }}
+        transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+        className="absolute inset-x-0 bottom-0 block h-px origin-left bg-white/[0.09]"
+      />
     </div>
   )
 }
@@ -662,8 +782,10 @@ function SiteCard({ site, onOpen }: { site: SiteMeta; onOpen: (slug: string) => 
             {site.latin}
           </p>
         </div>
-        <div className="w-[84px] shrink-0 overflow-hidden rounded border border-white/[0.08]">
-          <SceneSignature slug={site.slug} />
+        <div className="rep-sig-frame w-[84px] shrink-0 overflow-hidden rounded border border-white/[0.08]">
+          <div className="rep-sig block will-change-transform">
+            <SceneSignature slug={site.slug} />
+          </div>
         </div>
       </div>
 
