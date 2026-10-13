@@ -63,6 +63,28 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
   const barRef = useRef<HTMLDivElement | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
 
+  /* Время чтения: честный подсчёт по фактическому тексту отчёта в DOM
+     (~160 слов в минуту плотного текста); живой счётчик в шапке — той же
+     мутацией textContent в rAF-цикле, без ре-рендеров */
+  const readTotalRef = useRef(0)
+  const readRef = useRef<HTMLSpanElement | null>(null)
+  const [readMinutes, setReadMinutes] = useState<number | null>(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    // rAF: подсчёт после первой отрисовки (setState в колбэке, не синхронно
+    // в теле эффекта — правило react-hooks/set-state-in-effect)
+    const raf = requestAnimationFrame(() => {
+      const words = (el.innerText ?? '').split(/\s+/).filter(Boolean).length
+      if (words < 60) return
+      const m = Math.max(2, Math.round(words / 160))
+      readTotalRef.current = m
+      setReadMinutes(m)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -75,6 +97,14 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
         const denom = el.scrollHeight - el.clientHeight
         const p = denom > 0 ? Math.min(1, Math.max(0, el.scrollTop / denom)) : 0
         if (barRef.current) barRef.current.style.transform = `scaleX(${p})`
+        // живой счётчик чтения: осталось минут от общего объёма; в самом
+        // конце — «прочитано» вместо цифры
+        const totalRead = readTotalRef.current
+        if (totalRead > 0 && readRef.current) {
+          const remain = Math.max(1, Math.ceil(totalRead * (1 - p)))
+          readRef.current.textContent =
+            p >= 0.98 ? 'прочитано' : `осталось ${remain} мин`
+        }
         // сколь-спай: активен последний раздел, чья голова ушла за шапку
         const rootTop = el.getBoundingClientRect().top
         let current: string | null = null
@@ -209,6 +239,14 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
                 )
               })}
             </nav>
+            {/* Живой счётчик чтения: textContent обновляется в rAF-цикле
+                скролла без ре-рендеров; только десктоп (шапка мобилы плотная) */}
+            <span
+              ref={readRef}
+              className="hidden shrink-0 font-mono text-[9px] uppercase tracking-[0.18em] text-[#8b8175] md:ml-2 md:inline"
+            >
+              {readMinutes ? `чтение ~${readMinutes} мин` : ''}
+            </span>
           </div>
           {/* Индикатор чтения: янтарная чернила на линейке рамки */}
           <div aria-hidden className="absolute inset-x-0 bottom-0 h-[2px] bg-white/[0.04]">
@@ -254,14 +292,19 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 {[
-                  '5 экспериментов',
-                  `${LAB_DEMOS.length} приборов лаборатории`,
-                  '20 референсов разведки',
-                  '1 маршрут',
-                ].map((t) => (
+                  { t: '5 экспериментов' },
+                  { t: `${LAB_DEMOS.length} приборов лаборатории` },
+                  ...(readMinutes ? [{ t: `~${readMinutes} мин чтения`, amber: true }] : []),
+                  { t: '20 референсов разведки' },
+                  { t: '1 маршрут' },
+                ].map(({ t, amber }) => (
                     <span
                       key={t}
-                      className="rounded-full border border-white/[0.09] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#9c937f]"
+                      className={
+                        amber
+                          ? 'rounded-full border border-[#d9a05b]/45 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#d9a05b]'
+                          : 'rounded-full border border-white/[0.09] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#9c937f]'
+                      }
                     >
                       {t}
                     </span>
@@ -392,7 +435,7 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
               title="Исследование: разведка перед полем"
               note="этап I · 20 позиций · MDN + caniuse"
             />
-            <p className="max-w-3xl text-[15px] leading-relaxed text-[#b5ac9e] md:text-base">
+            <p className="rep-dropcap max-w-3xl text-[15px] leading-relaxed text-[#b5ac9e] md:text-base">
               Прежде чем строить, проект разобрал современный иммерсивный веб: канон Awwwards
               за десять лет, статус свежих API, синтез звука без единого ассета, физику текста
               и генеративные методы. Разведка отвечала на один вопрос — чем сегодня может
@@ -519,7 +562,7 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
             />
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div>
-                <p className="max-w-2xl text-[15px] leading-relaxed text-[#b5ac9e]">
+                <p className="rep-dropcap max-w-2xl text-[15px] leading-relaxed text-[#b5ac9e]">
                   Одиннадцать приборных панелей с живыми параметрами — прототипы, на которых
                   приёмы отрабатывались до попадания в эксперименты. Каждое демо —
                   автономный прибор: экран реагирует на курсор, панель параметров честно

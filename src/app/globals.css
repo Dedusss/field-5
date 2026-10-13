@@ -162,3 +162,15 @@
 .grabbing-cursor {
   cursor: grabbing;
 }
+
+/* Буквица в лидах разделов отчёта — как в печатном журнале:
+   кириллица Корморантом, янтарная, в три строки текста */
+.rep-dropcap::first-letter {
+  float: left;
+  margin: 0.05em 0.14em 0 0;
+  font-family: var(--font-cormorant), Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(2.4rem, 4.6vw, 3.3rem);
+  line-height: 0.82;
+  color: #d9a05b;
+}
