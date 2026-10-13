@@ -1,7 +1,7 @@
 /**
  * ЛАБОРАТОРИЯ · FIELD·5 — реестр демо и категории.
  *
- * Порядок массива = порядок приборов на полке (L·01…L·08).
+ * Порядок массива = порядок приборов на полке (L·01…L·10).
  */
 
 import type { DemoCategory, DemoModule } from '@/lib/lab/types'
@@ -14,6 +14,7 @@ import { textParticlesDemo } from './textParticles'
 import { lgardenDemo } from './lgarden'
 import { verletRopeDemo } from './verletRope'
 import { oscilloscopeDemo } from './oscilloscope'
+import { halftoneDemo } from './halftone'
 
 export const DEMOS: DemoModule[] = [
   flowFieldDemo,
@@ -25,6 +26,7 @@ export const DEMOS: DemoModule[] = [
   lgardenDemo,
   verletRopeDemo,
   oscilloscopeDemo,
+  halftoneDemo,
 ]
 
 /** Метаданные категорий для фильтров и чипов карточек. */

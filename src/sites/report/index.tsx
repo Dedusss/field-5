@@ -168,8 +168,12 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
                 в вашем браузере.
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                {['5 экспериментов', '8 приборов лаборатории', '20 референсов разведки', '1 маршрут'].map(
-                  (t) => (
+                {[
+                  '5 экспериментов',
+                  `${LAB_DEMOS.length} приборов лаборатории`,
+                  '20 референсов разведки',
+                  '1 маршрут',
+                ].map((t) => (
                     <span
                       key={t}
                       className="rounded-full border border-white/[0.09] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#9c937f]"
@@ -423,12 +427,12 @@ export default function ReportSite({ onExit }: { onExit: () => void }) {
             <SectionHead
               index="05"
               title="Лаборатория: приборы, из которых всё выросло"
-              note="этап V · 9 демо · src/lib/lab"
+              note={`этап V · ${LAB_DEMOS.length} демо · src/lib/lab`}
             />
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div>
                 <p className="max-w-2xl text-[15px] leading-relaxed text-[#b5ac9e]">
-                  Девять приборных панелей с живыми параметрами — прототипы, на которых
+                  Десять приборных панелей с живыми параметрами — прототипы, на которых
                   приёмы отрабатывались до попадания в эксперименты. Каждое демо —
                   автономный прибор: экран реагирует на курсор, панель параметров честно
                   пересчитывает кадр.

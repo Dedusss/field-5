@@ -61,7 +61,7 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
         <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-5 md:px-10">
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' })}
-            className="group flex items-center gap-3"
+            className="group flex items-center gap-3 rounded-sm outline-offset-4 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]"
             aria-label="Наверх"
           >
             <span className="block h-2.5 w-2.5 bg-[#d9a05b] transition-transform duration-300 group-hover:rotate-45" />
@@ -73,19 +73,19 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
           <nav className="flex items-center gap-1 md:gap-2" aria-label="Основная навигация">
             <button
               onClick={scrollToProjects}
-              className="rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6]"
+              className="rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] outline-offset-4 transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]"
             >
               Эксперименты
             </button>
             <button
               onClick={() => navigate('report')}
-              className="rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6]"
+              className="rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] outline-offset-4 transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]"
             >
               Отчёт
             </button>
             <button
               onClick={() => navigate('lab')}
-              className="rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6]"
+              className="rounded-sm px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[#b5ac9e] outline-offset-4 transition-colors hover:bg-white/[0.05] hover:text-[#f2e3c6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]"
             >
               Лаборатория
             </button>
@@ -200,7 +200,7 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
         <section className="mx-auto grid max-w-[1440px] gap-4 px-5 pb-20 md:grid-cols-2 md:px-10">
           <button
             onClick={() => navigate('report')}
-            className="group relative overflow-hidden rounded-lg border border-white/[0.09] bg-white/[0.02] p-7 text-left transition-colors hover:border-[#d9a05b]/40 hover:bg-white/[0.04] md:p-9"
+            className="group relative overflow-hidden rounded-lg border border-white/[0.09] bg-white/[0.02] p-7 text-left outline-offset-[-3px] transition-colors hover:border-[#d9a05b]/40 hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]/70 md:p-9"
           >
             <FileSearch className="mb-5 h-5 w-5 text-[#d9a05b]" />
             <h3 className="font-serif text-3xl italic text-[#f2e3c6] md:text-4xl">
@@ -217,7 +217,7 @@ export default function Hub({ navigate }: { navigate: (slug: RouteSlug) => void 
           </button>
           <button
             onClick={() => navigate('lab')}
-            className="group relative overflow-hidden rounded-lg border border-white/[0.09] bg-white/[0.02] p-7 text-left transition-colors hover:border-[#e8b34d]/40 hover:bg-white/[0.04] md:p-9"
+            className="group relative overflow-hidden rounded-lg border border-white/[0.09] bg-white/[0.02] p-7 text-left outline-offset-[-3px] transition-colors hover:border-[#e8b34d]/40 hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#e8b34d]/70 md:p-9"
           >
             <FlaskConical className="mb-5 h-5 w-5 text-[#e8b34d]" />
             <h3 className="font-serif text-3xl italic text-[#f2e3c6] md:text-4xl">
@@ -299,14 +299,13 @@ function ProjectRow({
       onMouseEnter={() => onHover(site.slug)}
       onFocus={() => onHover(site.slug)}
       onBlur={() => onHover(null)}
-      className="group block w-full border-t border-white/[0.08] py-7 text-left transition-colors duration-300 last:border-b hover:bg-white/[0.025] md:py-8"
+      className="group block w-full border-t border-white/[0.08] py-7 text-left outline-offset-[-3px] transition-colors duration-300 last:border-b hover:bg-white/[0.025] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#d9a05b]/60 md:py-8"
       style={{ '--site-accent': site.accent } as React.CSSProperties}
       aria-label={`Открыть эксперимент ${site.index} «${site.title}»`}
     >
       <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 md:grid-cols-[64px_1fr_280px_120px] md:gap-8">
         <span
           className="font-mono text-sm text-[#5e574c] transition-colors duration-300 group-hover:text-[var(--site-accent)]"
-          style={{ color: undefined }}
         >
           {site.index}
         </span>
